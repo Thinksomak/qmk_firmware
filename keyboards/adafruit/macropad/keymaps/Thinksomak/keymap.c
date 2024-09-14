@@ -95,7 +95,6 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 // Username & Password
   case KC_CRDNTLS1:
     if (record->event.pressed) {
-    //   SEND_STRING("1214973@tcs.com\t12345*TCS.com\n");
     SEND_STRING(CRED_USER1 "\t" CRED_PASS1 "\n");
     }
     return false;
