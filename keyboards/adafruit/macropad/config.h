@@ -48,3 +48,16 @@
 #define AUDIO_PWM_CHANNEL RP2040_PWM_CHANNEL_A
 #define AUDIO_INIT_DELAY
 #define AUDIO_CLICKY
+
+#define SPEAKER_SHUTDOWN GP14
+
+#ifdef RGB_MATRIX_ENABLE
+
+     /* RGB Defines */
+#    define RGB_MATRIX_LED_COUNT 12
+
+     /* Enable Framebuffer and keypress effects */
+#    define RGB_MATRIX_FRAMEBUFFER_EFFECTS
+#    define RGB_MATRIX_KEYPRESSES
+
+#endif
