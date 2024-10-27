@@ -43,21 +43,12 @@
 #define RP2040_BOOTLOADER_DOUBLE_TAP_RESET_TIMEOUT 500U
 
 /* Audio */
-#define AUDIO_PIN GP16
-#define AUDIO_PWM_DRIVER PWMD0
-#define AUDIO_PWM_CHANNEL RP2040_PWM_CHANNEL_A
-#define AUDIO_INIT_DELAY
-#define AUDIO_CLICKY
+// #define AUDIO_PIN GP16
+// #define AUDIO_PWM_DRIVER PWMD0
+// #define AUDIO_PWM_CHANNEL RP2040_PWM_CHANNEL_A
+// #define AUDIO_INIT_DELAY
+// #define AUDIO_CLICKY
 
 #define SPEAKER_SHUTDOWN GP14
 
-#ifdef RGB_MATRIX_ENABLE
-
-     /* RGB Defines */
-#    define RGB_MATRIX_LED_COUNT 12
-
-     /* Enable Framebuffer and keypress effects */
-#    define RGB_MATRIX_FRAMEBUFFER_EFFECTS
-#    define RGB_MATRIX_KEYPRESSES
-
-#endif
+#define DYNAMIC_KEYMAP_LAYER_COUNT 7
