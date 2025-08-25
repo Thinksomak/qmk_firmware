@@ -1,18 +1,20 @@
-/* Copyright 2020 Koichi Katano
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 2 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+/*
+Copyright 2023 NEO
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 2 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include QMK_KEYBOARD_H
 
 
@@ -46,25 +48,21 @@ typedef struct {
 
 // Tap dance enums
 enum {
-    TD_UP,
-    TD_DOWN,
-    TD_RIGHT,
-    TD_LEFT,
     TD_COPY,
     TD_PASTE,
+    TD_RIGHT,
+    TD_LEFT,
     TD_MEDIA,
     TD_LDRK,
     TD_BSLS,
     TD_CUT
-    };
+};
 
 #define TPDN_L      TD(TD_LEFT)
-#define TPDN_U      TD(TD_UP)
 #define TPDN_R      TD(TD_RIGHT)
-#define TPDN_D      TD(TD_DOWN)
 #define TPDN_CP     TD(TD_COPY)
 #define TPDN_PS     TD(TD_PASTE)
-#define CK_MEDI     TD(TD_MEDIA)
+#define TPDN_ME     TD(TD_MEDIA)
 #define CK_LDRK     TD(TD_LDRK)
 #define CK_BSLS     TD(TD_BSLS)
 #define TPDN_X      TD(TD_CUT)
@@ -85,6 +83,7 @@ td_state_t cur_dance(tap_dance_state_t *state);
 void x_finished(tap_dance_state_t *state, void *user_data);
 void x_reset(tap_dance_state_t *state, void *user_data);
 
+//----------------------------------------------------------------------------------------------------------------------------------
 enum layer_names {
     _BASE,
     _FN1,
@@ -92,40 +91,45 @@ enum layer_names {
     _FN3
 };
 
+
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
-    [_BASE] = LAYOUT_60_ansi_split_bs_rshift(
-        KC_ESC,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS, KC_EQL,   KC_BSPC,   KC_DEL,
-        KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_LBRC, KC_RBRC,             CK_BSLS,
-        CK_LDRK, CK_AM01, KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT,                      KC_ENT,
-        CK_OSFT,          KC_Z,    TPDN_X,  TPDN_CP, TPDN_PS, KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH,           TPDN_U,    CK_MEDI,
-        KC_LCTL, KC_LGUI, KC_LALT,                            KC_SPC,                                      MO(_FN1),TPDN_L,   TPDN_D,    TPDN_R
-    ),
-    [_FN1] = LAYOUT_60_ansi_split_bs_rshift(
-        QK_BOOT, KC_F1,      KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,   _______, _______,
-        _______, _______,    _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______,
-        _______, _______,    CK_CSTB, CK_CTB,  _______, _______, _______, _______, _______, _______, _______, CK_CSDL,                    CK_CF5,
-        _______,             _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           KC_UP,   _______,
-        _______, _______,    _______,                            _______,                                     _______, KC_LEFT,  KC_DOWN, KC_RIGHT
-    ),
-    [_FN2] = LAYOUT_60_ansi_split_bs_rshift(
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,  _______, _______,
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______,
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                    _______,
-        _______,          _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______, _______,
-        KC_PWR,  _______, _______,                            _______,                                     _______, _______,  _______, _______
-    ),
-    [_FN3] = LAYOUT_60_ansi_split_bs_rshift(
-        KC_ESC,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS, KC_EQL,  KC_GRV,  KC_BSPC,
-        KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_LBRC, KC_RBRC,          CK_BSLS,
-        KC_CAPS, KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT,                   KC_ENT,
-        KC_LSFT,          KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH,          KC_RSFT, CK_MEDI,
-        KC_LCTL, KC_LGUI, KC_LALT,                            KC_SPC,                                      KC_RALT, KC_RGUI, KC_APP,  KC_RCTL
-    )
+	[_BASE] = LAYOUT_hot(
+		KC_ESC,  KC_1,    KC_2,    KC_3,   KC_4,     KC_5,    KC_6,    KC_7,    KC_8,    KC_9,   KC_0,    KC_MINS, KC_EQL,  CK_BSLS, KC_BSPC, KC_DEL,
+		KC_TAB,  KC_Q,    KC_W,    KC_E,   KC_R,     KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,   KC_P,    KC_LBRC, KC_RBRC, CK_BSLS, KC_HOME,
+		CK_LDRK, CK_AM01, KC_S,    KC_D,   KC_F,     KC_G,    KC_H,    KC_J,    KC_K,    KC_L,   KC_SCLN, KC_QUOT,          KC_ENT,  KC_END,
+		CK_OSFT,          KC_Z,    TPDN_X, TPDN_CP,  TPDN_PS, KC_B,    KC_N,    KC_M,    KC_COMM,KC_DOT,  KC_SLSH, KC_RSFT, KC_UP,   TPDN_ME,
+		KC_LCTL, KC_LGUI, KC_LALT,                   KC_SPC,                             MO(1),  MO(2),            TPDN_L,  KC_DOWN, TPDN_R
+	),
+	[_FN1] = LAYOUT_hot(
+		KC_GRV,  KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,  KC_TRNS, KC_TRNS, KC_TRNS,
+		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS,
+		KC_TRNS, KC_TRNS, CK_CSTB, CK_CTB,  KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, CK_CSDL,          CK_CF5,  KC_TRNS,
+		KC_TRNS,          KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_UP,   KC_TRNS,
+		KC_TRNS, KC_TRNS, KC_TRNS,                   KC_TRNS,                            KC_TRNS, KC_TRNS,          KC_LEFT, KC_DOWN, KC_RIGHT
+	),
+	[_FN2] = LAYOUT_hot(
+		KC_GRV,  KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,  KC_TRNS, KC_TRNS, KC_TRNS,
+		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, NK_TOGG, KC_TRNS,
+		KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, NK_TOGG, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS,          KC_TRNS, KC_TRNS,
+		KC_TRNS,          RGB_TOG, RGB_MOD, RGB_RMOD,RGB_HUI, RGB_HUD, RGB_SAI, RGB_SAD, RGB_VAI, RGB_VAD, KC_TRNS, KC_TRNS, KC_TRNS, KC_TRNS,
+		KC_PWR,  QK_BOOT, KC_TRNS,                   KC_TRNS,                            KC_TRNS, KC_TRNS,          KC_TRNS, KC_TRNS, KC_TRNS
+	),
+	[_FN3] = LAYOUT_hot(
+		KC_ESC,  KC_1,    KC_2,    KC_3,   KC_4,     KC_5,    KC_6,    KC_7,    KC_8,    KC_9,   KC_0,    KC_MINS, KC_EQL,  CK_BSLS, KC_BSPC, KC_DEL,
+		KC_TAB,  KC_Q,    KC_W,    KC_E,   KC_R,     KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,   KC_P,    KC_LBRC, KC_RBRC, CK_BSLS, KC_HOME,
+		KC_CAPS, KC_A,    KC_S,    KC_D,   KC_F,     KC_G,    KC_H,    KC_J,    KC_K,    KC_L,   KC_SCLN, KC_QUOT,          KC_ENT,  KC_END,
+		KC_LSFT,          KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M,    KC_COMM,KC_DOT,  KC_SLSH, KC_RSFT, KC_UP,   TPDN_ME,
+		KC_LCTL, KC_LGUI, KC_LALT,                   KC_SPC,                             KC_RALT,MO(1),            KC_LEFT, KC_DOWN, KC_RIGHT
+	)
 };
 
+void matrix_init_user(void) {
+    eeconfig_init();  // Reset the EEPROM
+    // Your other initialization code here
+    // rgb_matrix_mode("BAND_PINWHEEL_SAT");
+}
 
-//--------------------- TAP HOLD DANCE ----------------------
-
+//----------------------------------------- TAP HOLD DANCE -----------------------------------------
 td_state_t cur_dance(tap_dance_state_t *state) {
     if (state->count == 1) {
         if (state->interrupted || !state->pressed) return TD_SINGLE_TAP;
@@ -165,15 +169,11 @@ void x_finished(tap_dance_state_t *state, void *user_data) {
             register_code(tap_data->keycode1);
             break;
         case TD_SINGLE_HOLD:
-            if (tap_data->identifier == TD_DOWN         ||
-                    tap_data->identifier == TD_RIGHT    ||
-                    tap_data->identifier == TD_COPY     ||
-                    tap_data->identifier == TD_CUT      ||
+            if (tap_data->identifier == TD_COPY     ||
+                    tap_data->identifier == TD_CUT  ||
                     tap_data->identifier == TD_PASTE){
                 register_code(KC_LCTL);
                 register_code(tap_data->keycode2);
-            } else if (tap_data->identifier == TD_LEFT) {
-                layer_on(_FN2);
             } else if (tap_data->identifier == TD_MEDIA) {
                 layer_on(_FN3);
             } else if (tap_data->identifier == TD_BSLS) {
@@ -190,11 +190,7 @@ void x_finished(tap_dance_state_t *state, void *user_data) {
             }
             break;
         case TD_DOUBLE_HOLD:
-            if (tap_data->identifier == TD_UP ||
-                    tap_data->identifier == TD_DOWN){
-                register_code(KC_LCTL);
-                register_code(tap_data->keycode4);
-            }else if (tap_data->identifier == TD_LEFT ||
+            if (tap_data->identifier == TD_LEFT ||
                     tap_data->identifier == TD_RIGHT) {
                 register_code(KC_LSFT);
                 register_code(tap_data->keycode4);
@@ -211,13 +207,7 @@ void x_finished(tap_dance_state_t *state, void *user_data) {
             register_code(tap_data->keycode1);
             break;
         case TD_TRIPLE_TAP:
-            if (tap_data->identifier == TD_UP ||
-                    tap_data->identifier == TD_DOWN){
-                register_code(KC_LSFT);
-                register_code(tap_data->keycode5);
-            } else {
-                register_code(tap_data->keycode5);
-            }
+            register_code(tap_data->keycode5);
             break;
         default: break;
     }
@@ -232,15 +222,11 @@ void x_reset(tap_dance_state_t *state, void *user_data) {
             unregister_code(tap_data->keycode1);
             break;
         case TD_SINGLE_HOLD:
-            if (tap_data->identifier == TD_DOWN         ||
-                    tap_data->identifier == TD_RIGHT    ||
-                    tap_data->identifier == TD_COPY     ||
+            if (tap_data->identifier == TD_COPY     ||
                     tap_data->identifier == TD_CUT      ||
                     tap_data->identifier == TD_PASTE){
                 unregister_code(KC_LCTL);
                 unregister_code(tap_data->keycode2);
-            } else if (tap_data->identifier == TD_LEFT) {
-                layer_off(_FN2);
             } else if (tap_data->identifier == TD_MEDIA) {
                 layer_off(_FN3);
             } else {
@@ -248,21 +234,17 @@ void x_reset(tap_dance_state_t *state, void *user_data) {
             }
             break;
         case TD_DOUBLE_TAP:
-            if (tap_data->identifier != TD_LDRK) {
+           if (tap_data->identifier != TD_LDRK) {
                 unregister_code(tap_data->keycode3);
             }
             break;
         case TD_DOUBLE_HOLD:
-            if (tap_data->identifier == TD_UP ||
-                    tap_data->identifier == TD_DOWN){
-                unregister_code(KC_LCTL);
-                unregister_code(tap_data->keycode4);
-            } else if (tap_data->identifier == TD_LEFT ||
+            if (tap_data->identifier == TD_LEFT ||
                     tap_data->identifier == TD_RIGHT) {
                 unregister_code(KC_LSFT);
                 unregister_code(tap_data->keycode4);
                 tap_code16(LCTL(KC_C));
-            } else {
+            }  else {
                 unregister_code(tap_data->keycode4);
             }
             break;
@@ -270,13 +252,7 @@ void x_reset(tap_dance_state_t *state, void *user_data) {
             unregister_code(tap_data->keycode1);
             break;
         case TD_TRIPLE_TAP:
-            if (tap_data->identifier == TD_UP ||
-                    tap_data->identifier == TD_DOWN ){
-                unregister_code(KC_LSFT);
-                unregister_code(tap_data->keycode5);
-            } else {
-                unregister_code(tap_data->keycode5);
-            }
+            unregister_code(tap_data->keycode5);
             break;
 
         default: break;
@@ -286,14 +262,6 @@ void x_reset(tap_dance_state_t *state, void *user_data) {
 
 // Tap Dance definitions
 tap_dance_action_t tap_dance_actions[] = {
-    [TD_UP]     = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
-                                                        &((tap_data_user){KC_UP, KC_RSFT, KC_PGUP, KC_HOME, KC_HOME, KC_NO, TD_UP})), //1tap-1hld-2tap-2hld-3tap
-    [TD_DOWN]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
-                                                        &((tap_data_user){KC_DOWN, KC_DOWN, KC_PGDN, KC_END, KC_END, KC_NO, TD_DOWN})), //1tap-1hld-2tap-2hld-3tap
-    [TD_LEFT]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
-                                                        &((tap_data_user){KC_LEFT, KC_LEFT, KC_HOME, KC_HOME, KC_NO, KC_NO, TD_LEFT})), //1tap-1hld-2tap-2hld-3tap
-    [TD_RIGHT]  = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
-                                                        &((tap_data_user){KC_RIGHT, KC_RIGHT, KC_END, KC_END, KC_NO, KC_NO, TD_RIGHT})), //1tap-1hld-2tap-2hld-3tap
     [TD_COPY]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
                                                         &((tap_data_user){KC_C, KC_C, KC_NO, KC_NO, KC_NO, KC_NO, TD_COPY})), //1tap-1hld-2tap-2hld-3tap
     [TD_PASTE]  = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
@@ -304,20 +272,19 @@ tap_dance_action_t tap_dance_actions[] = {
                                                         &((tap_data_user){KC_CAPS, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, TD_LDRK})), //1tap-1hld-2tap-2hld-3tap
     [TD_BSLS]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
                                                         &((tap_data_user){KC_BSLS, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, TD_BSLS})), //1tap-1hld-2tap-2hld-3tap
+    [TD_LEFT]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
+                                                        &((tap_data_user){KC_LEFT, KC_LEFT, KC_NO, KC_HOME, KC_NO, KC_NO, TD_LEFT})), //1tap-1hld-2tap-2hld-3tap
+    [TD_RIGHT]  = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
+                                                        &((tap_data_user){KC_RIGHT, KC_RIGHT, KC_NO, KC_END, KC_NO, KC_NO, TD_RIGHT})), //1tap-1hld-2tap-2hld-3tap
     [TD_CUT]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
                                                         &((tap_data_user){KC_X, KC_X, KC_X, KC_NO, KC_X, KC_X, TD_CUT})), //1tap-1hld-2tap-2hld-3tap
 };
+
+
 //--------------------- Get Custom TAPPING TERM/KEY ---------------------
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
     switch (keycode) {
-        case TPDN_L:
-            return TAPPING_TERM - 20;
-        case TPDN_R:
-            return TAPPING_TERM - 20;
-        case TPDN_D:
-            return TAPPING_TERM - 20;
-        case TPDN_U:
-            return TAPPING_TERM - 20;
+
         default:
             return TAPPING_TERM;
     }
@@ -347,7 +314,6 @@ void leader_end_user(void) {
     }
 }
 
-
-/*# qmk flash -kb chickenman/ciel -km Thinksomak
-    qmk compile -kb chickenman/ciel -km Thinksomak
+/*# qmk flash -kb neo/neo65/ansi -km Thinksomak
+    qmk compile -kb neo/neo65/ansi -km Thinksomak
 */

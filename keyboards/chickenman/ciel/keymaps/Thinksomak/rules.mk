@@ -20,3 +20,4 @@ ENCODER_ENABLE = no				# Enable encoder
 RGB_MATRIX_ENABLE = no 			# Enable per-key RGB matrix lighting
 OLED_ENABLE = no				# Enable OLED display
 
+LEADER_ENABLE = yes
