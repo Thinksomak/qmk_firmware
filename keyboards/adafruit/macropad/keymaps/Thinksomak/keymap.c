@@ -54,6 +54,8 @@ typedef struct {
     td_state_t state;
 } td_tap_t;
 
+#define CK_CSTB     S(KC_TAB)
+
 // typedef struct{
 // 	uint16_t keycode;
 // } tap_data_user;
@@ -65,13 +67,14 @@ typedef struct {
     uint16_t keycode4;
     uint16_t keycode5;
     uint16_t keycode6;
+    uint16_t identifier;
 } tap_data_user;
 
 // Tap dance enums
 enum {
-    TD_WIND,
     TD_CRED_2,
-    TD_WHEEL
+    TD_RUN,
+    TD_CRED_1
 };
 
 #define ACTION_TAP_DANCE_FN_ADVANCED_USER(user_fn_on_each_tap, user_fn_on_dance_finished, user_fn_on_dance_reset, user_user_data) \
@@ -114,9 +117,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   [1] = LAYOUT(                     // Macro Layer [2] - OFFICE
                                     KC_AUDIO_MUTE,
       TSK_MGR,      _______,        NO_SLEEP,
-      TD(TD_WIND),  TD(TD_WHEEL),   _______,
-      KC_VOLD,      KC_MUTE,        KC_VOLU,
-      KC_CRDNTLS1,  TD(TD_CRED_2),  KC_VOLU
+      CK_CSTB,      KC_TAB,         KC_DEL,
+      KC_VOLD,      KC_MUTE,        KC_MS_BTN2,
+      TD(TD_CRED_1),TD(TD_CRED_2),  TD(TD_RUN)
   ),
   [2] = LAYOUT(                     // Macro Layer - II [3]
                                     KC_AUDIO_MUTE,
@@ -194,6 +197,20 @@ void cred_send_string(tap_dance_state_t *state, void *user_data) {
             break;
     }
 };
+void cred_send_string_tcs(tap_dance_state_t *state, void *user_data) {
+    switch (state->count) {
+        case 1:
+            SEND_STRING(CRED_USER1 "\t");
+            break;
+        case 2:
+            SEND_STRING(CRED_PASS1 "\n");
+            break;
+        case 3:
+            SEND_STRING(CRED_USER1 "\t" CRED_PASS1 "\n");
+
+            break;
+    }
+};
 //---------------------------------------------------------------------------------------
 
 // Layer Switching
@@ -202,6 +219,7 @@ void cred_send_string(tap_dance_state_t *state, void *user_data) {
 void matrix_init_user(void) {
     eeconfig_init();  // Reset the EEPROM
     // Your other initialization code here
+    // set_single_persistent_default_layer(2);
 }
 
 void keyboard_post_init_user(void) {
@@ -419,89 +437,109 @@ static td_tap_t xtap_state = {
 
 void x_finished(tap_dance_state_t *state, void *user_data) {
     // uint16_t keycode = ((tap_data_user*)user_data)->keycode;
-    uint16_t  keycode1   = ((tap_data_user *)user_data)->keycode1;
-    uint16_t  keycode2   = ((tap_data_user *)user_data)->keycode2;
-    uint16_t  keycode3   = ((tap_data_user *)user_data)->keycode3;
-
-    uint16_t  keycode4   = ((tap_data_user *)user_data)->keycode4;
-    uint16_t  keycode5   = ((tap_data_user *)user_data)->keycode5;
-    // uint16_t  keycode6   = ((tap_data_user *)user_data)->keycode6;
-
+    tap_data_user *tap_data = (tap_data_user *)user_data;
 
     xtap_state.state = cur_dance(state);
     switch (xtap_state.state) {
         case TD_SINGLE_TAP:
-            register_code(keycode1);
-            register_code(keycode2);
+            if (tap_data->identifier == TD_RUN) {
+                register_code(tap_data->keycode1);
+                register_code(tap_data->keycode2);
+            }else {
+                register_code(tap_data->keycode1);
+            }
             break;
         case TD_SINGLE_HOLD:
-            register_code(keycode1);
-            register_code(keycode3);
+            if (tap_data->identifier == TD_RUN) {
+                register_code(tap_data->keycode5);
+                register_code(tap_data->keycode3);
+                register_code(tap_data->keycode6);
+            } else {
+                register_code(tap_data->keycode4);
+            }
             break;
         case TD_DOUBLE_TAP:
-            register_code(keycode1);
-            register_code(keycode4);
+            if (tap_data->identifier == TD_RUN) {
+                register_code(tap_data->keycode1);
+                register_code(tap_data->keycode3);
+                register_code(tap_data->keycode4);
+            }else {
+                register_code(tap_data->keycode3);
+            }
             break;
         case TD_DOUBLE_HOLD:
-            register_code(keycode1);
-            register_code(keycode5);
+            register_code(tap_data->keycode1);
             break;
-        // case TD_DOUBLE_HOLD: register_code(KC_A); break;
+
         // Last case is for fast typing. Assuming your key is `f`:
         // For example, when typing the word `buffer`, and you want to make sure that you send `ff` and not `Esc`.
         // In order to type `ff` when typing fast, the next character will have to be hit within the `TAPPING_TERM`, which by default is 200ms.
-        // case TD_DOUBLE_SINGLE_TAP:
-        //     tap_code(KC_X);
-        //     register_code(KC_X);
-        //     break;
+        case TD_DOUBLE_SINGLE_TAP:
+            register_code(tap_data->keycode1);
+            break;
+        case TD_TRIPLE_TAP:
+            register_code(tap_data->keycode1);
+            break;
         default: break;
     }
 }
 
 void x_reset(tap_dance_state_t *state, void *user_data) {
     // uint16_t keycode = ((tap_data_user*)user_data)->keycode;
-    uint16_t  keycode1   = ((tap_data_user *)user_data)->keycode1;
-    uint16_t  keycode2   = ((tap_data_user *)user_data)->keycode2;
-    uint16_t  keycode3   = ((tap_data_user *)user_data)->keycode3;
-
-    uint16_t  keycode4   = ((tap_data_user *)user_data)->keycode4;
-    uint16_t  keycode5   = ((tap_data_user *)user_data)->keycode5;
-    // uint16_t  keycode6   = ((tap_data_user *)user_data)->keycode6;
+    tap_data_user *tap_data = (tap_data_user *)user_data;
 
     switch (xtap_state.state) {
         case TD_SINGLE_TAP:
-            unregister_code(keycode1);
-            unregister_code(keycode2);
+            if (tap_data->identifier == TD_RUN) {
+                unregister_code(tap_data->keycode1);
+                unregister_code(tap_data->keycode2);
+            } else if (tap_data->identifier == TD_CRED_1) {
+                unregister_code(PSTR(tap_data->keycode1));
+            } else {
+                unregister_code(tap_data->keycode1);
+            }
             break;
         case TD_SINGLE_HOLD:
-            unregister_code(keycode1);
-            unregister_code(keycode3);
+            if (tap_data->identifier == TD_RUN) {
+                unregister_code(tap_data->keycode5);
+                unregister_code(tap_data->keycode3);
+                unregister_code(tap_data->keycode6);
+            } else {
+                unregister_code(tap_data->keycode4);
+            }
             break;
         case TD_DOUBLE_TAP:
-            unregister_code(keycode1);
-            unregister_code(keycode4);
+           if (tap_data->identifier == TD_RUN) {
+                unregister_code(tap_data->keycode1);
+                unregister_code(tap_data->keycode3);
+                unregister_code(tap_data->keycode4);
+            } else {
+                unregister_code(tap_data->keycode3);
+            }
             break;
         case TD_DOUBLE_HOLD:
-            unregister_code(keycode1);
-            unregister_code(keycode5);
+            unregister_code(tap_data->keycode1);
             break;
-        // case TD_DOUBLE_HOLD: unregister_code(KC_A); break;
-        // case TD_DOUBLE_SINGLE_TAP:
-        //     unregister_code(KC_X);
-        //     break;
+        case TD_DOUBLE_SINGLE_TAP:
+            unregister_code(tap_data->keycode1);
+            break;
+        case TD_TRIPLE_TAP:
+           unregister_code(tap_data->keycode1);
+            break;
+
         default: break;
     }
     xtap_state.state = TD_NONE;
 }
 
-
 // Tap Dance definitions
 tap_dance_action_t tap_dance_actions[] = {
+    [TD_CRED_1] = ACTION_TAP_DANCE_FN(cred_send_string_tcs),
     [TD_CRED_2] = ACTION_TAP_DANCE_FN(cred_send_string),
-    [TD_WIND] = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
-                                                        &((tap_data_user){KC_LGUI, KC_LEFT, KC_UP, KC_RIGHT, KC_DOWN,})),
-    [TD_WHEEL] = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset,
-                                                        &((tap_data_user){KC_A, KC_B, KC_C, KC_D, KC_E})),
+    [TD_RUN]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
+                                                        &((tap_data_user){KC_LCTL, KC_F5, KC_LSFT, KC_DEL, KC_LALT, KC_F, TD_RUN})),
+
+
 };
 //---------------------- RGB Blinker Function ----------------------
 #ifdef OLED_ENABLE
@@ -521,3 +559,9 @@ void rgb_blinker(uint16_t rVal, uint16_t gVal, uint16_t bVal)
 }
 
 #endif
+
+
+/*
+qmk complile -kb adafruit/macropad -km Thinksomak
+qmk flash -kb adafruit/macropad -km Thinksomak
+*/

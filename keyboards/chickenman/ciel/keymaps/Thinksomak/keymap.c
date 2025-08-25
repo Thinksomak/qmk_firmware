@@ -52,8 +52,11 @@ enum {
     TD_LEFT,
     TD_COPY,
     TD_PASTE,
-    TD_MEDIA
-};
+    TD_MEDIA,
+    TD_LDRK,
+    TD_BSLS,
+    TD_CUT
+    };
 
 #define TPDN_L      TD(TD_LEFT)
 #define TPDN_U      TD(TD_UP)
@@ -62,10 +65,16 @@ enum {
 #define TPDN_CP     TD(TD_COPY)
 #define TPDN_PS     TD(TD_PASTE)
 #define CK_MEDI     TD(TD_MEDIA)
+#define CK_LDRK     TD(TD_LDRK)
+#define CK_BSLS     TD(TD_BSLS)
+#define TPDN_X      TD(TD_CUT)
 
 #define CK_CSTB     C(S(KC_TAB))
 #define CK_CTB      C(KC_TAB)
 #define CK_AM01     LT(_FN1, KC_A)
+#define CK_OSFT     OSM(MOD_LSFT)
+#define CK_CSDL     C(S(KC_DEL))
+#define CK_CF5      C(KC_F5)
 
 #define ACTION_TAP_DANCE_FN_ADVANCED_USER(user_fn_on_each_tap, user_fn_on_dance_finished, user_fn_on_dance_reset, user_user_data) \
         { .fn = {user_fn_on_each_tap, user_fn_on_dance_finished, user_fn_on_dance_reset}, .user_data = (void*)user_user_data, }
@@ -86,31 +95,31 @@ enum layer_names {
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [_BASE] = LAYOUT_60_ansi_split_bs_rshift(
         KC_ESC,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS, KC_EQL,   KC_BSPC,   KC_DEL,
-        KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_LBRC, KC_RBRC,             KC_BSLS,
-        KC_CAPS, CK_AM01, KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT,                      KC_ENT,
-        KC_LSFT,          KC_Z,    KC_X,    TPDN_CP, TPDN_PS, KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH,           TPDN_U,    CK_MEDI,
+        KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_LBRC, KC_RBRC,             CK_BSLS,
+        CK_LDRK, CK_AM01, KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT,                      KC_ENT,
+        CK_OSFT,          KC_Z,    TPDN_X,  TPDN_CP, TPDN_PS, KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH,           TPDN_U,    CK_MEDI,
         KC_LCTL, KC_LGUI, KC_LALT,                            KC_SPC,                                      MO(_FN1),TPDN_L,   TPDN_D,    TPDN_R
     ),
     [_FN1] = LAYOUT_60_ansi_split_bs_rshift(
         QK_BOOT, KC_F1,      KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,   _______, _______,
         _______, _______,    _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______,
-        _______, _______,    CK_CSTB, CK_CTB,  _______, _______, _______, _______, _______, _______, _______, _______,                    _______,
-        _______,             _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______, _______,
-        _______, _______,    _______,                            _______,                                     _______, _______,  _______, _______
+        _______, _______,    CK_CSTB, CK_CTB,  _______, _______, _______, _______, _______, _______, _______, CK_CSDL,                    CK_CF5,
+        _______,             _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           KC_UP,   _______,
+        _______, _______,    _______,                            _______,                                     _______, KC_LEFT,  KC_DOWN, KC_RIGHT
     ),
     [_FN2] = LAYOUT_60_ansi_split_bs_rshift(
         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,  _______, _______,
         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______,
         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                    _______,
         _______,          _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______, _______,
-        _______, _______, _______,                            _______,                                     _______, _______,  _______, _______
+        KC_PWR,  _______, _______,                            _______,                                     _______, _______,  _______, _______
     ),
     [_FN3] = LAYOUT_60_ansi_split_bs_rshift(
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,  _______, _______,
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______,
-        _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,                    _______,
-        _______,          _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______, _______,
-        _______, _______, _______,                            _______,                                     _______, _______,  _______, _______
+        KC_ESC,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS, KC_EQL,  KC_GRV,  KC_BSPC,
+        KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_LBRC, KC_RBRC,          CK_BSLS,
+        KC_CAPS, KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT,                   KC_ENT,
+        KC_LSFT,          KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH,          KC_RSFT, CK_MEDI,
+        KC_LCTL, KC_LGUI, KC_LALT,                            KC_SPC,                                      KC_RALT, KC_RGUI, KC_APP,  KC_RCTL
     )
 };
 
@@ -159,6 +168,7 @@ void x_finished(tap_dance_state_t *state, void *user_data) {
             if (tap_data->identifier == TD_DOWN         ||
                     tap_data->identifier == TD_RIGHT    ||
                     tap_data->identifier == TD_COPY     ||
+                    tap_data->identifier == TD_CUT      ||
                     tap_data->identifier == TD_PASTE){
                 register_code(KC_LCTL);
                 register_code(tap_data->keycode2);
@@ -166,12 +176,18 @@ void x_finished(tap_dance_state_t *state, void *user_data) {
                 layer_on(_FN2);
             } else if (tap_data->identifier == TD_MEDIA) {
                 layer_on(_FN3);
-            }  else {
+            } else if (tap_data->identifier == TD_BSLS) {
+                layer_invert(_FN3);
+            } else {
                 register_code(tap_data->keycode2);
             }
             break;
         case TD_DOUBLE_TAP:
-            register_code(tap_data->keycode3);
+            if (tap_data->identifier == TD_LDRK) {
+                leader_start();
+            } else {
+                register_code(tap_data->keycode3);
+            }
             break;
         case TD_DOUBLE_HOLD:
             if (tap_data->identifier == TD_UP ||
@@ -219,6 +235,7 @@ void x_reset(tap_dance_state_t *state, void *user_data) {
             if (tap_data->identifier == TD_DOWN         ||
                     tap_data->identifier == TD_RIGHT    ||
                     tap_data->identifier == TD_COPY     ||
+                    tap_data->identifier == TD_CUT      ||
                     tap_data->identifier == TD_PASTE){
                 unregister_code(KC_LCTL);
                 unregister_code(tap_data->keycode2);
@@ -231,7 +248,9 @@ void x_reset(tap_dance_state_t *state, void *user_data) {
             }
             break;
         case TD_DOUBLE_TAP:
-            unregister_code(tap_data->keycode3);
+            if (tap_data->identifier != TD_LDRK) {
+                unregister_code(tap_data->keycode3);
+            }
             break;
         case TD_DOUBLE_HOLD:
             if (tap_data->identifier == TD_UP ||
@@ -252,7 +271,7 @@ void x_reset(tap_dance_state_t *state, void *user_data) {
             break;
         case TD_TRIPLE_TAP:
             if (tap_data->identifier == TD_UP ||
-                    tap_data->identifier == TD_DOWN){
+                    tap_data->identifier == TD_DOWN ){
                 unregister_code(KC_LSFT);
                 unregister_code(tap_data->keycode5);
             } else {
@@ -280,7 +299,13 @@ tap_dance_action_t tap_dance_actions[] = {
     [TD_PASTE]  = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
                                                         &((tap_data_user){KC_V, KC_V, KC_NO, KC_NO, KC_NO, KC_NO, TD_PASTE})), //1tap-1hld-2tap-2hld-3tap
     [TD_MEDIA]  = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
-                                                        &((tap_data_user){KC_VOLU, KC_NO, KC_MUTE, KC_VOLD, KC_NO, KC_NO, TD_MEDIA})), //1tap-1hld-2tap-2hld-3tap
+                                                        &((tap_data_user){KC_VOLU, KC_NO, KC_MUTE, KC_VOLD, KC_MSTP, KC_NO, TD_MEDIA})), //1tap-1hld-2tap-2hld-3tap
+    [TD_LDRK]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
+                                                        &((tap_data_user){KC_CAPS, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, TD_LDRK})), //1tap-1hld-2tap-2hld-3tap
+    [TD_BSLS]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
+                                                        &((tap_data_user){KC_BSLS, KC_NO, KC_NO, KC_NO, KC_NO, KC_NO, TD_BSLS})), //1tap-1hld-2tap-2hld-3tap
+    [TD_CUT]   = ACTION_TAP_DANCE_FN_ADVANCED_USER(NULL, x_finished, x_reset, \
+                                                        &((tap_data_user){KC_X, KC_X, KC_X, KC_NO, KC_X, KC_X, TD_CUT})), //1tap-1hld-2tap-2hld-3tap
 };
 //--------------------- Get Custom TAPPING TERM/KEY ---------------------
 uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
@@ -297,3 +322,32 @@ uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
             return TAPPING_TERM;
     }
 }
+//----------------------- LEADER KEY -----------------------
+void leader_end_user(void) {
+    if (leader_sequence_one_key(KC_0)) {
+        SEND_STRING("()" SS_TAP(X_LEFT));
+    }
+    if (leader_sequence_one_key(KC_LBRC)) {
+        SEND_STRING("[]" SS_TAP(X_LEFT));
+    }
+    if (leader_sequence_one_key(KC_RBRC)) {
+        SEND_STRING("{}" SS_TAP(X_LEFT));
+    }
+    if (leader_sequence_one_key(KC_1)) {
+        SEND_STRING(".com");
+    }
+    if (leader_sequence_one_key(KC_2)) {
+        SEND_STRING(".com");
+    }
+    if (leader_sequence_one_key(KC_3)) {
+        SEND_STRING("s@com");
+    }
+    if (leader_sequence_one_key(KC_4)) {
+        SEND_STRING("pass");
+    }
+}
+
+
+/*# qmk flash -kb chickenman/ciel -km Thinksomak
+    qmk compile -kb chickenman/ciel -km Thinksomak
+*/
