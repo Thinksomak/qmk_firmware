@@ -61,4 +61,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #    define DRIVER_COUNT                  1
 #    define RGB_MATRIX_LED_COUNT          68   //DRIVER_LED_TOTAL              //RGB_MATRIX_LED_COUNT
 
+// IS31FL3741 driver macros for driver/led/issi/is31fl3741.c
+#define IS31FL3741_DRIVER_COUNT 1
+#define IS31FL3741_I2C_ADDRESS_1 0x74
+
 #endif
