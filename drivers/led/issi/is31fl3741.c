@@ -21,6 +21,7 @@
 #include "i2c_master.h"
 #include "gpio.h"
 #include "wait.h"
+#include "keyboards/neo/neo65/ansi/is31fl3741_board_defs.h"
 
 #define IS31FL3741_PWM_0_REGISTER_COUNT 180
 #define IS31FL3741_PWM_1_REGISTER_COUNT 171

@@ -562,6 +562,6 @@ void rgb_blinker(uint16_t rVal, uint16_t gVal, uint16_t bVal)
 
 
 /*
-qmk complile -kb adafruit/macropad -km Thinksomak
+qmk compile -kb adafruit/macropad -km Thinksomak
 qmk flash -kb adafruit/macropad -km Thinksomak
 */
