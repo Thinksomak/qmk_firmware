@@ -73,8 +73,9 @@ enum {
 #define CK_CTB      C(KC_TAB)
 #define CK_AM01     LT(_FN1, KC_A)
 #define CK_OSFT     OSM(MOD_LSFT)
-#define CK_CSDL     C(S(KC_DEL))
-#define CK_CF5      C(KC_F5)
+#define CK_RSQL     C(S(KC_R))          // VSCode SQL RUN
+#define CK_HIDE     C(KC_J)             // VSCode HIDE Output Window
+
 
 #define ACTION_TAP_DANCE_FN_ADVANCED_USER(user_fn_on_each_tap, user_fn_on_dance_finished, user_fn_on_dance_reset, user_user_data) \
         { .fn = {user_fn_on_each_tap, user_fn_on_dance_finished, user_fn_on_dance_reset}, .user_data = (void*)user_user_data, }
@@ -94,18 +95,18 @@ enum layer_names {
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [_BASE] = LAYOUT_60_ansi_split_bs_rshift(
-        KC_ESC,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS, KC_EQL,   KC_BSPC,   KC_DEL,
+        QK_GESC, KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_6,    KC_7,    KC_8,    KC_9,    KC_0,    KC_MINS, KC_EQL,   KC_BSPC,   KC_DEL,
         KC_TAB,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_Y,    KC_U,    KC_I,    KC_O,    KC_P,    KC_LBRC, KC_RBRC,             CK_BSLS,
         CK_LDRK, CK_AM01, KC_S,    KC_D,    KC_F,    KC_G,    KC_H,    KC_J,    KC_K,    KC_L,    KC_SCLN, KC_QUOT,                      KC_ENT,
         CK_OSFT,          KC_Z,    TPDN_X,  TPDN_CP, TPDN_PS, KC_B,    KC_N,    KC_M,    KC_COMM, KC_DOT,  KC_SLSH,           TPDN_U,    CK_MEDI,
         KC_LCTL, KC_LGUI, KC_LALT,                            KC_SPC,                                      MO(_FN1),TPDN_L,   TPDN_D,    TPDN_R
     ),
     [_FN1] = LAYOUT_60_ansi_split_bs_rshift(
-        QK_BOOT, KC_F1,      KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,   _______, _______,
+        QK_BOOT, KC_F1,      KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_F7,   KC_F8,   KC_F9,   KC_F10,  KC_F11,  KC_F12,   CK_HIDE, _______,
         _______, _______,    _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           _______,
-        _______, _______,    CK_CSTB, CK_CTB,  _______, _______, _______, _______, _______, _______, _______, CK_CSDL,                    CK_CF5,
+        _______, _______,    CK_CSTB, CK_CTB,  _______, _______, _______, _______, _______, _______, _______, _______,                    CK_RSQL,
         _______,             _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,           KC_UP,   _______,
-        _______, _______,    _______,                            _______,                                     _______, KC_LEFT,  KC_DOWN, KC_RIGHT
+        _______, _______,    _______,                            KC_MS_BTN2,                                  _______, KC_LEFT,  KC_DOWN, KC_RIGHT
     ),
     [_FN2] = LAYOUT_60_ansi_split_bs_rshift(
         _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______, _______,  _______, _______,
@@ -175,7 +176,7 @@ void x_finished(tap_dance_state_t *state, void *user_data) {
             } else if (tap_data->identifier == TD_LEFT) {
                 layer_on(_FN2);
             } else if (tap_data->identifier == TD_MEDIA) {
-                layer_on(_FN3);
+                register_code(tap_data->keycode1);
             } else if (tap_data->identifier == TD_BSLS) {
                 layer_invert(_FN3);
             } else {
@@ -242,7 +243,7 @@ void x_reset(tap_dance_state_t *state, void *user_data) {
             } else if (tap_data->identifier == TD_LEFT) {
                 layer_off(_FN2);
             } else if (tap_data->identifier == TD_MEDIA) {
-                layer_off(_FN3);
+                unregister_code(tap_data->keycode1);
             } else {
                 unregister_code(tap_data->keycode2);
             }
@@ -308,42 +309,27 @@ tap_dance_action_t tap_dance_actions[] = {
                                                         &((tap_data_user){KC_X, KC_X, KC_X, KC_NO, KC_X, KC_X, TD_CUT})), //1tap-1hld-2tap-2hld-3tap
 };
 //--------------------- Get Custom TAPPING TERM/KEY ---------------------
-uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
-    switch (keycode) {
-        case TPDN_L:
-            return TAPPING_TERM - 20;
-        case TPDN_R:
-            return TAPPING_TERM - 20;
-        case TPDN_D:
-            return TAPPING_TERM - 20;
-        case TPDN_U:
-            return TAPPING_TERM - 20;
-        default:
-            return TAPPING_TERM;
-    }
-}
+// uint16_t get_tapping_term(uint16_t keycode, keyrecord_t *record) {
+//     switch (keycode) {
+//         case TPDN_L:
+//             return TAPPING_TERM - 20;
+//         case TPDN_R:
+//             return TAPPING_TERM - 20;
+//         case TPDN_D:
+//             return TAPPING_TERM - 20;
+//         case TPDN_U:
+//             return TAPPING_TERM - 20;
+//         default:
+//             return TAPPING_TERM;
+//     }
+// }
 //----------------------- LEADER KEY -----------------------
 void leader_end_user(void) {
     if (leader_sequence_one_key(KC_0)) {
         SEND_STRING("()" SS_TAP(X_LEFT));
     }
-    if (leader_sequence_one_key(KC_LBRC)) {
-        SEND_STRING("[]" SS_TAP(X_LEFT));
-    }
-    if (leader_sequence_one_key(KC_RBRC)) {
-        SEND_STRING("{}" SS_TAP(X_LEFT));
-    }
     if (leader_sequence_one_key(KC_1)) {
-        SEND_STRING(".com");
-    }
-    if (leader_sequence_one_key(KC_2)) {
-        SEND_STRING(".com");
-    }
-    if (leader_sequence_one_key(KC_3)) {
-        SEND_STRING("s@com");
-    }
-    if (leader_sequence_one_key(KC_4)) {
-        SEND_STRING("pass");
+        SEND_STRING("SELECT * FROM ");
     }
 }
 
