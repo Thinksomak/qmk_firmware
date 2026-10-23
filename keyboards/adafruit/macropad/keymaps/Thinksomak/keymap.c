@@ -118,7 +118,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
                                     KC_AUDIO_MUTE,
       TSK_MGR,      _______,        NO_SLEEP,
       CK_CSTB,      KC_TAB,         KC_DEL,
-      KC_VOLD,      KC_MUTE,        KC_MS_BTN2,
+      KC_VOLD,      KC_MUTE,        MS_BTN2,
       TD(TD_CRED_1),TD(TD_CRED_2),  TD(TD_RUN)
   ),
   [2] = LAYOUT(                     // Macro Layer - II [3]
@@ -137,9 +137,9 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   ),
   [4] = LAYOUT(                     // System Layer [5]
                                     KC_AUDIO_MUTE,
-      RGB_TOG,      RGB_MOD,        QK_BOOTLOADER,
-      RGB_VAI,      RGB_RMOD,       KC_MYCM,
-      RGB_SPI,      RGB_SPD,        RGB_M_R,
+      RM_TOGG,      RM_NEXT,        QK_BOOTLOADER,
+      RM_VALU,      RM_PREV,       KC_MYCM,
+      RM_SPDU,      RM_SPDD,        RGB_M_R,
       KC_VOLD,      KC_MUTE,        KC_VOLU
   ),
 };
@@ -308,8 +308,8 @@ void matrix_scan_user(void) {
     if (stop_screensaver) {                                             //if screensaver mode is active
         if (timer_elapsed32(last_activity_timer) > SCREENSAVE_DELAY) {  //and no key has been pressed in more than SCREENSAVE_DELAY ms
             // tap_code16(KC_F13);                                      //  tap F13
-            register_code(KC_MS_UP);                                    // Simulate a mouse movement
-            unregister_code(KC_MS_UP);
+            register_code(MS_UP);                                    // Simulate a mouse movement
+            unregister_code(MS_UP);
             last_activity_timer = timer_read32();                       //  reset last_activity_timer
         }
     }
