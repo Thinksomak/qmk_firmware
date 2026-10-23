@@ -246,6 +246,12 @@ via*.json
 /keyboards/**/keymaps/vial/*
 
 
-C:\Users\somak\qmk_firmware\keyboards\adafruit\macropad\keymaps\Thinksomak\config.h
 
 keyboards/adafruit/macropad/keymaps/Thinksomak/config.h
+
+# local-only
+keyboards/wireless/
+get-pip.py
+remove_sensitive_lines.py
+CLAUDE.local.md
+.claude/settings.local.json
