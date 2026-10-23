@@ -14,7 +14,6 @@ A personal fork of QMK Firmware (`origin` = Thinksomak/qmk_firmware, `upstream` 
 | `chickenman/ciel` | atmega32u2 / atmel-dfu | `keymaps/Thinksomak/` (LTO on; flash space is tight) |
 | `monsgeek/m1` | WB32FQ95 / wb32-dfu | `keymaps/Thinksomak/`; board `m1.c` edited: persistent default layers and RGB toggle handling |
 | `neo/neo65/ansi` | STM32F103 / stm32duino (app at `0x08006000`, custom linker script in `ld/`) | Whole board definition is custom, brought over from an older tree (not in upstream). `keyboard.json` holds all data-driven config (old `info.json` was merged into it on 2026-10-23). Also has a `shigure` keymap. |
-| `neo/neo65/solder` | STM32F103 / stm32duino | Custom board from the same old tree; still uses `info.json` only. NOT yet migrated to `keyboard.json` like `ansi`. Likely needs the same fix (see Lessons below). |
 
 All `Thinksomak` keymaps enable VIA, tap dance, and mouse keys. Keycodes were migrated to current QMK names (`MS_*` for mouse, `RM_*` for RGB matrix). Use the current names, not legacy `KC_MS_*` / `RGB_*`.
 
@@ -37,7 +36,7 @@ qmk compile -kb adafruit/macropad -km Thinksomak
 qmk compile -kb chickenman/ciel   -km Thinksomak
 qmk compile -kb monsgeek/m1       -km Thinksomak
 qmk compile -kb neo/neo65/ansi    -km Thinksomak
-# qmk compile -kb neo/neo65/solder  -km <keymap>   # check which keymap exists
+
 qmk flash   -kb <kb> -km <km>      # compile + flash (put the board in bootloader first)
 make <kb>:<km>                     # legacy equivalent, e.g. make neo/neo65/ansi:Thinksomak
 ```
