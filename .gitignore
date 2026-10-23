@@ -128,3 +128,11 @@ compile_commands.json
 via*.json
 /keyboards/**/keymaps/via/*
 /keyboards/**/keymaps/vial/*
+
+# Thinksomak local-only
+keyboards/adafruit/macropad/keymaps/Thinksomak/config.h
+keyboards/wireless/
+get-pip.py
+remove_sensitive_lines.py
+CLAUDE.local.md
+.claude/settings.local.json
