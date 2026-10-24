@@ -29,3 +29,9 @@ OLED_ENABLE = yes				# Enable OLED display
 OLED_TRANSPORT = spi			# Enable SPI transport
 
 
+
+# Pomodoro timer, stats, EEPROM storage, No-Sleep, and the OLED / RGB front ends
+SRC += pomodoro.c storage.c stats.c nosleep.c boot_confirm.c ui_oled.c ui_rgb.c
+# EEPROM user datablock: pomodoro settings + stats, 32 bytes (see storage.c).
+# Bump the version whenever the layout changes; QMK then wipes the old block.
+OPT_DEFS += -DEECONFIG_USER_DATA_SIZE=32 -DEECONFIG_USER_DATA_VERSION=0x504D0002
