@@ -1,37 +1,27 @@
+# Thinksomak keymap for adafruit/macropad: build features and sources.
+# The board (keyboard.json, rules.mk) already turns on the encoder, OLED
+# over SPI, RGB matrix, extra keys and NKRO; the lines below only change
+# what this keymap needs differently.
 
+VIA_ENABLE = yes            # remap keys in the VIA app; also brings Raw HID (sysinfo.c)
+ENCODER_MAP_ENABLE = yes    # the knob's twist comes from encoder_map[] in keymap.c
+TAP_DANCE_ENABLE = yes      # MACRO layer: secure macro keys and RUN
+MOUSEKEY_ENABLE = yes       # off on the board; No-Sleep sends its nudges through it
+BOOTMAGIC_ENABLE = no       # on for the board; SYSTEM's BOOT key does this job
+AUDIO_ENABLE = no           # on for the board; the speaker is not used
+OPT_DEFS += -DNO_DEBUG      # no console, so drop the debug code
 
-#define OLED_DISPLAY_128X64
-#define OLED_IC OLED_IC_SH1106
-#define RGB_MATRIX_LED_COUNT 12
-
-VIA_ENABLE = yes
-
-BOOTLOADER = rp2040
-OPT_DEFS += -DNO_DEBUG
-
-ENCODER_MAP_ENABLE = yes		# Enable encoder
-TAP_DANCE_ENABLE = yes			# Enable Tap Dance
-
-BOOTMAGIC_ENABLE = no  			# Enable Bootmagic Lite
-MOUSEKEY_ENABLE = yes			# Mouse keys
-EXTRAKEY_ENABLE = yes   		# Audio control and System control
-CONSOLE_ENABLE = no 			# Console for debug
-COMMAND_ENABLE = no 			# Commands for debug and configuration
-# NKRO_ENABLE = yes   			# Enable N-Key Rollover - Deprecated
-NKRO_DEFAULT_ON = yes           # Enable N-Key Rollover
-BACKLIGHT_ENABLE = no   		# Enable keyboard backlight functionality
-# RGBLIGHT_ENABLE = no			# Enable keyboard RGB underglow
-AUDIO_ENABLE = no   			# Audio output
-# AUDIO_DRIVER = pwm_hardware
-ENCODER_ENABLE = yes			# Enable encoder
-RGB_MATRIX_ENABLE = yes 		# Enable per-key RGB matrix lighting
-OLED_ENABLE = yes				# Enable OLED display
-OLED_TRANSPORT = spi			# Enable SPI transport
-
-
-
-# Pomodoro timer, stats, EEPROM storage, No-Sleep, and the OLED / RGB front ends
+# Pomodoro timer, stats, EEPROM storage, No-Sleep, boot confirm, OLED and RGB
 SRC += pomodoro.c storage.c stats.c nosleep.c boot_confirm.c ui_oled.c ui_rgb.c
-# EEPROM user datablock: pomodoro settings + stats, 32 bytes (see storage.c).
-# Bump the version whenever the layout changes; QMK then wipes the old block.
-OPT_DEFS += -DEECONFIG_USER_DATA_SIZE=32 -DEECONFIG_USER_DATA_VERSION=0x504D0002
+# Numpad operators on hold, and the calculator (calc.c is pure C, see tests/)
+SRC += numpad_ops.c calc.c
+OPT_DEFS += -DQUICK_TAP_TERM_PER_KEY
+# PC stats over Raw HID; the PC agent is in host/
+SRC += sysinfo.c
+
+# EEPROM user datablock: pomodoro settings + stats + SYSINFO settings, 64
+# bytes (see storage.c; it was 32 up to layout 3). Bumping the version makes
+# QMK wipe the block (settings and stats): don't. Layout changes go through
+# storage.c's own layout number, which upgrades old blocks instead. A size
+# change moves VIA's EEPROM area, so VIA reloads its keymap once.
+OPT_DEFS += -DEECONFIG_USER_DATA_SIZE=64 -DEECONFIG_USER_DATA_VERSION=0x504D0002

@@ -60,6 +60,28 @@ qmk test-c -t tap_dance         # one suite (dir name under tests/), also: make 
 qmk pytest                      # Python tests for lib/python (qmk CLI)
 ```
 
+## Macropad Thinksomak keymap (adafruit/macropad)
+
+Modular files in `keyboards/adafruit/macropad/keymaps/Thinksomak/`, each listed in its `rules.mk` `SRC`:
+
+| File | Job |
+|---|---|
+| `keymap.c` | 6 main layers in knob order: NUMPAD, MACRO, MEDIA, NAV, SYSTEM (with RGB), POMODORO (no mouse layer; `MOUSEKEY_ENABLE` stays for No-Sleep); encoder map `KC_LDN`/`KC_LUP` on every layer; OLED legends (`numpad` flag = digit / hold-operator columns); positional maps for pomodoro EDIT/STATS and SYSINFO view/SETUP; MACRO tap dances (secure macro keys TD_CRED_1/2, RUN); layer LEDs; the `process_record_user` chain |
+| `numpad_ops.c` | numpad keys are `NP(kc)` = `LT(0, kc)`; the hold is intercepted (7 %, 8 /, 9 *, 5 -, 6 +, 0 ., ENT = calculator); per-key tapping terms; `#error` checks on tap-hold options; in calculator mode the twist scrolls the expression by display lines |
+| `calc.c` | desk calculator, pure C (int64 fixed point, 6 decimals): the expression is a list of numbers and operators (`calc_tok_t`, exact values; the oldest folded into `base` past 96 characters) and the value is replayed from it after every key, so Backspace can step back one character or operator at a time; the expression never shows `=`; `calc_display_lines()` breaks the expression into the OLED's 20-character small-font lines (tape style, a new line before each operator); `calc_value_rounded()` drives the `≈` mark, so screen, knob scroll limit and tests share one rule; unit test `tests/run_calc_test.sh` (needs `/mingw64/bin/gcc` in PATH) |
+| `sysinfo.c` | Raw HID receive (`via_command_kb` in keymap.c passes command 0xC5 here), history, SYSINFO view/SETUP, display style OFF / STRIP / SAVER (screensaver) |
+| `pomodoro.c`, `stats.c`, `nosleep.c`, `boot_confirm.c` | pomodoro timer, stats, keep-awake, two-step bootloader |
+| `storage.c` | the 64-byte EEPROM user datablock, layout 4 (30 bytes free); upgrades the 32-byte layouts 2 and 3 in place, clearing what VIA left in bytes 32-63 |
+| `ui_oled.c`, `ui_rgb.c` | every OLED screen and LED overlay; the screen-off gate and screensaver. Key legends, the calculator and SYSINFO are drawn in an 8-page canvas (`cv_*`) at exact pixel positions; legends sit on three fixed columns centred at x 21 / 64 / 107 |
+| `host/` | PC agent (`main.py`, `macropad_sysinfo.ini`, `build.bat`, README) that sends PC stats over Raw HID |
+| `USER_GUIDE.md` | the user manual: every layer, key, mode, setting, flashing and recovery |
+
+`process_record_user` order matters: boot confirm, the "first twist only wakes" rule, pomodoro, sysinfo, numpad, then the keymap's own keycodes.
+
+Knob convention: **the twist always changes the main layer (wrapping); a mode that is open takes it for its own values** (pomodoro edit / stats / adjust / alert, SYSINFO view and SETUP, calculator scroll) and lets go the moment it closes. The mode is worked out from what is open, never stored. The OLED header marks only the exceptions, with a plain glyph at its left: ± where the twist changes a value; stats and SYSINFO show their page number `k/N` on the right instead; the calculator shows a scrollbar while its expression has more than three lines (small expression on top, a divider, then `=` at the left and the value large and right-aligned, stepping down to a medium size when too wide). Main layers show no glyph. While the screen is off or the screensaver shows, the first twist only wakes it; keys wake it and act.
+
+Host agent: needs Python 3.8+ from python.org (QMK MSYS's Python cannot build psutil). `cd host && py -3 -m venv .venv && .venv\Scripts\pip install -r requirements.txt && .venv\Scripts\python main.py --console`; `build.bat` makes `dist\macropad-sysinfo.exe` (`build.bat --console` for a debug build). `main.py --stop` ends a running agent cleanly; `--dry-run` needs no device.
+
 ## Repo-specific architecture notes
 
 - Config layering (later wins): core defaults, keyboard JSON, keyboard `config.h`/`rules.mk`, keymap `config.h`/`rules.mk`. Keymap `rules.mk` toggles features per keymap (`VIA_ENABLE`, `TAP_DANCE_ENABLE`, `RGB_MATRIX_ENABLE`, ...).
@@ -76,8 +98,23 @@ qmk pytest                      # Python tests for lib/python (qmk CLI)
 - neo65/ansi: two matrix entries (the Backspace and `\` keys, around lines 91 and 107 of `keyboard.json`) differed between the owner's old `info.json` and the upstream-style file. The owner's values are kept. If those keys misbehave on hardware, the values are swapped.
 - `features.rgb_matrix` in the JSON must be true when the keymap sets `RGB_MATRIX_ENABLE = yes`.
 
+## Lessons from the macropad features (2026-10-24)
+
+- VIA keeps its EEPROM keymap across same-day reflashes. The macropad keymap fingerprints `keymaps[]` + `encoder_map[]` and reloads them when they change; other VIA boards do not.
+- The keymap `config.h` is force-included (`-include`) into every source file, so a module can check its settings with `#ifdef`/`#error` without anyone opening that file.
+- Raw HID next to VIA: define `via_command_kb()` and return true only for your own command byte; VIA handles everything else.
+- The OLED driver's font is `static`; to draw glyphs yourself, `#include OLED_FONT_H` again in your file.
+- Never search the macropad keymap folder with a glob (`*.h`, `**`): it would include the private `config.h`. Name the files.
+- QMK checks the user datablock by its version only, not its size. Growing `EECONFIG_USER_DATA_SIZE` keeps the old bytes but moves VIA's area, so the new bytes hold VIA leftovers and must be cleared on upgrade (storage.c does).
+- The OLED screens can be rendered on the PC by compiling `ui_oled.c` and friends with stub `oled_*` functions; that is how the field guide's screen pictures are made.
+- Screens that need exact pixel positions (key legends, calculator, SYSINFO and its screensaver) are composed in an 8-page canvas in `ui_oled.c` (`cv_*` helpers); the rest draw straight onto the 8-px page grid. SYSINFO overview pages come from `sysinfo_overview_items()`, which decides the split.
+- The keymap blanks every LED each frame (`rgb_matrix_indicators_advanced_user`) and lights only indicators, so the RGB effect itself is never visible; MODE / SPD keys only change the stored effect.
+- Never call `eeconfig_update_user()` in the macropad keymap: the datablock version lives in that word. Inside the 32 bytes use storage.c's layout number, not `EECONFIG_USER_DATA_VERSION` (bumping that wipes settings and stats).
+- From Git Bash, `timeout -s INT` does not reach a native Windows process; stop the agent with `main.py --stop`. `bash --login` in QMK MSYS changes to the home folder, so pass absolute paths.
+
 ## Workflow rules
 
+- Update `keyboards/adafruit/macropad/keymaps/Thinksomak/USER_GUIDE.md` whenever key layouts, modes or settings change.
 - Work on `qmk-2026` or a feature branch off it. As of 2026-10-23 it contains `upstream/master` (tag 0.34.7), 6 commits ahead and 0 behind.
 - To update: `git fetch upstream && git merge upstream/master`, then compile ALL five targets above and run `qmk lint` on any board JSON touched.
 - Do not push, force-push, rebase published history, or run git-filter-repo without asking first. Pushing needs a GitHub personal access token entered by the owner.

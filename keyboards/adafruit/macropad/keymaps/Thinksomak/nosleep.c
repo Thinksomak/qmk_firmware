@@ -1,6 +1,16 @@
 // Copyright 2026 Somak Mondal <mondalsomak@gmail.com>
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+/*
+ * No-Sleep (see nosleep.h). State machine, driven by nosleep_task():
+ *     off  --toggle-->  waiting  --NOSLEEP_INTERVAL_MS-->  +1 sent ("owed")
+ *     +1 sent  --NOSLEEP_STEP_MS-->  -1 sent  -->  waiting
+ * The -1 is always sent once the +1 went out, even if No-Sleep is switched
+ * off in between: that is the zero-drift guarantee. A PC that is asleep, or
+ * mouse keys that are moving, make it wait and look again after
+ * NOSLEEP_RETRY_MS.
+ */
+
 #include QMK_KEYBOARD_H
 #include "nosleep.h"
 #include "usb_device_state.h"
@@ -21,6 +31,8 @@ static bool host_awake(void) {
     return usb_device_state_get_configure_state() == USB_DEVICE_STATE_CONFIGURED;
 }
 
+/* How a nudge is sent. pad_busy(): mouse keys are moving, so wait.
+ * nudge(true) sends the first half, nudge(false) the second. */
 #if NOSLEEP_USE_F15
 static bool pad_busy(void) {
     return false;
@@ -53,6 +65,7 @@ static void nudge(bool first) {
 }
 #endif
 
+/* The state machine above, one step per housekeeping tick. */
 void nosleep_task(void) {
     if (owed) {
         // Always pay back the -1, even if No-Sleep was switched off meanwhile.
@@ -75,10 +88,13 @@ void nosleep_task(void) {
     nudged     = true;
 }
 
+/* NO_SLEEP key. The first nudge comes one interval after switching on. */
 void nosleep_toggle(void) {
     on = !on;
     if (on && !owed) mark = timer_read32(); // first nudge one interval from now
 }
+
+/* ---- Getters (see nosleep.h) ----------------------------------------- */
 
 bool nosleep_is_on(void) {
     return on;

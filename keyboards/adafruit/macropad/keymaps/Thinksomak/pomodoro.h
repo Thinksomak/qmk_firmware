@@ -201,37 +201,38 @@ bool pomodoro_process_record(pomodoro_cmd_t cmd, uint16_t keycode, keyrecord_t *
 
 /* ---- Read-only state ------------------------------------------------- */
 
-pomodoro_state_t           pomodoro_state(void);
-pomodoro_phase_t           pomodoro_phase(void);
-pomodoro_phase_t           pomodoro_next_phase(void);
+pomodoro_state_t           pomodoro_state(void);         // what shows: alert, a view, paused, or the phase
+pomodoro_phase_t           pomodoro_phase(void);         // the loaded phase (IDLE before START)
+pomodoro_phase_t           pomodoro_next_phase(void);    // what comes after it
 bool                       pomodoro_is_paused(void);     // a phase is loaded and paused
 bool                       pomodoro_is_ready(void);      // ...paused at full length, waiting for START
 bool                       pomodoro_can_reopen(void);    // ADJUST would re-open the phase that just ended
 int16_t                    pomodoro_delta_minutes(void); // time added (+) or taken (-) by ADJUST
 bool                       pomodoro_auto_start(void);
-uint32_t                   pomodoro_remaining_ms(void);
-uint32_t                   pomodoro_total_ms(void);
-uint8_t                    pomodoro_sessions_done(void); // focus sessions done this cycle
-uint8_t                    pomodoro_phase_minutes(pomodoro_phase_t phase);
-const pomodoro_settings_t *pomodoro_settings(void);
-pomodoro_toast_t           pomodoro_toast(void);
+uint32_t                   pomodoro_remaining_ms(void);                    // IDLE: the focus length
+uint32_t                   pomodoro_total_ms(void);                        // the phase's length, with ADJUST's changes
+uint8_t                    pomodoro_sessions_done(void);                   // focus sessions done this cycle
+uint8_t                    pomodoro_phase_minutes(pomodoro_phase_t phase); // set length of a phase
+const pomodoro_settings_t *pomodoro_settings(void);                        // saved settings
+pomodoro_toast_t           pomodoro_toast(void);                           // confirmation to show, if any
 
-pomodoro_alert_t pomodoro_alert(void);
-uint32_t         pomodoro_alert_elapsed(void);
+pomodoro_alert_t pomodoro_alert(void);         // the phase-end alert showing, if any
+uint32_t         pomodoro_alert_elapsed(void); // ms since it started (LED and OLED animation)
 
-bool                       pomodoro_is_editing(void);
-pomodoro_field_t           pomodoro_edit_field(void);
-const pomodoro_settings_t *pomodoro_edit_values(void);
+bool                       pomodoro_is_editing(void);  // EDIT is open
+pomodoro_field_t           pomodoro_edit_field(void);  // ...its selected field
+const pomodoro_settings_t *pomodoro_edit_values(void); // ...and the values being edited
 
-bool    pomodoro_is_viewing_stats(void);
-uint8_t pomodoro_stats_page(void);
+bool    pomodoro_is_viewing_stats(void);     // STATS is open
+uint8_t pomodoro_stats_page(void);           // ...on this page (POMO_STATS_PAGE_*)
 uint8_t pomodoro_stats_clear_progress(void); // 0 = not holding, 1..255 = hold progress
-bool    pomodoro_stats_just_cleared(void);
+bool    pomodoro_stats_just_cleared(void);   // "cleared" shows for POMODORO_CLEARED_MS
 
-bool pomodoro_is_adjusting(void);
+bool pomodoro_is_adjusting(void); // ADJUST is open: the knob changes the time left
 
 /* ---- Optional keymap hooks ------------------------------------------- */
 
+/* A phase-end alert started (wake the screen and LEDs) / ended. */
 void pomodoro_alert_start_user(pomodoro_alert_t alert);
 void pomodoro_alert_end_user(void);
 

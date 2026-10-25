@@ -1,6 +1,35 @@
 // Copyright 2026 Somak Mondal <mondalsomak@gmail.com>
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+/*
+ * Pomodoro timer: phases, alerts, the EDIT / STATS / ADJUST views and
+ * their keys. pomodoro.h lists the keys, settings and hooks.
+ *
+ * State machine. One phase at a time:
+ *     IDLE (READY) --START--> FOCUS --ends--> SHORT BREAK --ends--> FOCUS ...
+ *     every SESSIONS-th focus ends in a LONG BREAK, which starts a new cycle
+ * Inside a phase: running <-> paused (START). A phase that reaches its set
+ * time completes: stats count it, an alert shows, and the next phase is
+ * loaded paused at full length ("ready"), or running when auto start is
+ * on. SKIP ends a phase early without counting it; RESET restarts it
+ * paused; FOCUS / BREAK / LONG jump straight to a phase; NEW CYCLE goes back
+ * to IDLE. While the next phase waits, ADJUST re-opens the phase that just
+ * ended with POMODORO_EXTEND_MIN more (an "extension", not counted twice).
+ * UNDO puts back the timer as it was before the last skip, reset, jump,
+ * re-open or new cycle (one level).
+ *
+ * Views over the clock (EDIT, STATS, ADJUST) and the alert read keys by
+ * position; pomodoro_process_record() routes every key to the right one.
+ *
+ * Time is kept as "left_at_mark minus the time since mark", so nothing
+ * depends on how often the task runs, and unsigned arithmetic survives the
+ * 49-day wrap of the millisecond timer.
+ *
+ * EEPROM (storage.c): settings and the auto-start flag are written only
+ * when SAVE changed a value or AUTO was pressed; stats only when a phase
+ * completes or they are cleared. Never per second.
+ */
+
 #include "pomodoro.h"
 #include <string.h>
 #include "storage.h"
@@ -72,6 +101,7 @@ static uint32_t         toast_at;
 /* Matrix keys whose press was consumed here, so their release is too. */
 static uint16_t swallow_mask;
 
+/* Minutes to milliseconds. */
 static uint32_t minutes_ms(uint8_t minutes) {
     return (uint32_t)minutes * 60000UL;
 }
@@ -86,12 +116,15 @@ __attribute__((weak)) void pomodoro_stats_clear_user(void) {}
 
 /* ---- Settings (saved through storage.c) ------------------------------ */
 
+/* The settings from pomodoro.h's defaults. */
 static void settings_defaults(pomodoro_settings_t *s) {
     for (uint8_t f = 0; f < POMO_FIELD_COUNT; f++) {
         s->val[f] = field_def[f];
     }
 }
 
+/* Every field inside its range. Anything else (an empty or damaged block)
+ * means defaults. */
 static bool settings_valid(const pomodoro_settings_t *s) {
     for (uint8_t f = 0; f < POMO_FIELD_COUNT; f++) {
         if (s->val[f] < field_min[f] || s->val[f] > field_max[f]) return false;
@@ -99,10 +132,12 @@ static bool settings_valid(const pomodoro_settings_t *s) {
     return true;
 }
 
+/* The next phase starts by itself when one ends. */
 static bool auto_start(void) {
     return options & OPT_AUTO_START;
 }
 
+/* A short confirmation on the clock's bottom line for POMODORO_TOAST_MS. */
 static void show_toast(pomodoro_toast_t t) {
     toast    = t;
     toast_at = timer_read32();
@@ -110,12 +145,14 @@ static void show_toast(pomodoro_toast_t t) {
 
 /* ---- Alerts ---------------------------------------------------------- */
 
+/* Starts a phase-end alert and tells the keymap (LEDs, wake-up). */
 static void alert_start(pomodoro_alert_t a) {
     alert       = a;
     alert_since = timer_read32();
     pomodoro_alert_start_user(a);
 }
 
+/* Ends the alert, if one shows, and lets the keymap undo its effects. */
 static void alert_end(void) {
     if (alert == POMO_ALERT_NONE) return;
     alert = POMO_ALERT_NONE;
@@ -124,11 +161,13 @@ static void alert_end(void) {
 
 /* ---- Views ----------------------------------------------------------- */
 
+/* Opens a view over the clock; its idle timeout counts from now. */
 static void view_open(view_t v) {
     view         = v;
     view_touched = timer_read32();
 }
 
+/* Back to the clock; a CLEAR being held is dropped. */
 static void view_close(void) {
     view     = VIEW_NONE;
     clearing = false;
@@ -147,6 +186,7 @@ static void bank_focus(void) {
     }
 }
 
+/* Makes p the phase at its set length, running or paused at full length. */
 static void load_phase(pomodoro_phase_t p, bool run) {
     phase        = p;
     total_ms     = minutes_ms(pomodoro_phase_minutes(p));
@@ -196,6 +236,7 @@ static void finish_phase(bool completed) {
 
 /* ---- Undo ------------------------------------------------------------ */
 
+/* Remembers the timer before an action, for UNDO. */
 static void snapshot_take(void) {
     undo = (snapshot_t){
         .valid           = true,
@@ -245,6 +286,7 @@ static void cmd_undo(void) {
 
 /* ---- Commands -------------------------------------------------------- */
 
+/* START: begins a cycle from READY, resumes, or pauses. */
 static void cmd_toggle(void) {
     if (phase == POMO_PHASE_IDLE) {
         sessions_done = 0;
@@ -263,6 +305,7 @@ static void cmd_toggle(void) {
     }
 }
 
+/* SKIP: on to the next phase without counting this one. */
 static void cmd_skip(void) {
     if (phase == POMO_PHASE_IDLE) return;
     snapshot_take();
@@ -301,6 +344,7 @@ static void cmd_jump(pomodoro_phase_t to) {
     can_reopen = false;
 }
 
+/* NEW CYCLE: back to READY with no sessions done. */
 static void cmd_new_cycle(void) {
     snapshot_take();
     bank_focus();
@@ -315,6 +359,7 @@ static void cmd_new_cycle(void) {
     show_toast(POMO_TOAST_NEW_CYCLE);
 }
 
+/* AUTO: auto start on / off, saved at once. */
 static void cmd_auto(void) {
     options ^= OPT_AUTO_START;
     storage_set_flags(options);
@@ -372,6 +417,7 @@ static void cmd_adjust(void) {
 
 /* ---- Edit view ------------------------------------------------------- */
 
+/* Changes the selected field by delta, kept inside its range. */
 static void edit_adjust(int8_t delta) {
     int16_t v = (int16_t)edit_vals.val[field] + delta;
     if (v < field_min[field]) v = field_min[field];
@@ -379,6 +425,8 @@ static void edit_adjust(int8_t delta) {
     edit_vals.val[field] = (uint8_t)v;
 }
 
+/* SAVE in the editor: keeps the new values and writes them, but only if
+ * one changed. */
 static void edit_save(void) {
     view_close();
     if (memcmp(&edit_vals, &settings, sizeof settings) == 0) return;
@@ -395,6 +443,7 @@ static void edit_save(void) {
     if (sessions_done > settings.val[POMO_FIELD_SESSIONS]) sessions_done = settings.val[POMO_FIELD_SESSIONS];
 }
 
+/* One editor key, by its job in pomodoro_edit_map. */
 static void edit_action(pomodoro_edit_action_t action) {
     switch (action) {
         case POMO_EDIT_SAVE:
@@ -440,6 +489,7 @@ static void edit_key(keyevent_t ev) {
     }
 }
 
+/* EDIT: opens the editor on a copy of the settings, at the first field. */
 static void cmd_edit(void) {
     edit_vals = settings;
     field     = POMO_FIELD_FOCUS;
@@ -448,6 +498,7 @@ static void cmd_edit(void) {
 
 /* ---- Stats view ------------------------------------------------------ */
 
+/* A key or knob event's job in the stats view. */
 static pomodoro_stats_action_t stats_key_action(keyevent_t ev) {
     if (ev.key.row == KEYLOC_ENCODER_CW) return POMO_STATS_NEXT;
     if (ev.key.row == KEYLOC_ENCODER_CCW) return POMO_STATS_PREV;
@@ -457,6 +508,8 @@ static pomodoro_stats_action_t stats_key_action(keyevent_t ev) {
     return POMO_STATS_NONE;
 }
 
+/* One stats-view key, by its job in pomodoro_stats_map. bit is the key's
+ * matrix bit, so letting go of CLEAR early can cancel the clear. */
 static void stats_action(pomodoro_stats_action_t action, uint16_t bit) {
     switch (action) {
         case POMO_STATS_BACK:
@@ -485,6 +538,7 @@ static void stats_action(pomodoro_stats_action_t action, uint16_t bit) {
     }
 }
 
+/* STATS: opens the stats view on the session page. */
 static void cmd_stats(void) {
     stats_page       = POMO_STATS_PAGE_SESSION;
     clearing         = false;
@@ -494,6 +548,7 @@ static void cmd_stats(void) {
 
 /* ---- Dispatch -------------------------------------------------------- */
 
+/* Runs a pomodoro key's command. */
 static void run_cmd(pomodoro_cmd_t cmd) {
     switch (cmd) {
         case POMO_CMD_TOGGLE:
@@ -557,6 +612,7 @@ static bool acts_at_alert(pomodoro_cmd_t cmd) {
 
 /* ---- Lifecycle ------------------------------------------------------- */
 
+/* Settings and the auto-start flag from storage; defaults if none valid. */
 void pomodoro_init(void) {
     settings = *storage_settings();
     if (!settings_valid(&settings)) {
@@ -567,6 +623,8 @@ void pomodoro_init(void) {
     options = storage_flags() & OPT_AUTO_START;
 }
 
+/* Every housekeeping tick: ends a phase at zero, keeps the focus time in
+ * the stats live, and runs out the alert, toast, stats clear and views. */
 void pomodoro_task(void) {
     if (phase != POMO_PHASE_IDLE && !paused) {
         uint32_t left = pomodoro_remaining_ms();
@@ -609,6 +667,9 @@ void pomodoro_task(void) {
 #endif
 }
 
+/* Key routing, in order: releases of keys used here are eaten; an alert
+ * is dismissed (and a few keys also act); an open view takes the key; then
+ * a pomodoro key runs its command. */
 bool pomodoro_process_record(pomodoro_cmd_t cmd, uint16_t keycode, keyrecord_t *record) {
     keyevent_t ev  = record->event;
     uint16_t   bit = 0;

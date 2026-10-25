@@ -136,3 +136,7 @@ get-pip.py
 remove_sensitive_lines.py
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Macropad sysinfo agent: PyInstaller output (build/, __pycache__ and .venv are ignored above)
+keyboards/adafruit/macropad/keymaps/Thinksomak/host/dist/
+keyboards/adafruit/macropad/keymaps/Thinksomak/host/*.spec

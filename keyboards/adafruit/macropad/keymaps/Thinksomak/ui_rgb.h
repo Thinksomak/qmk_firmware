@@ -23,6 +23,10 @@ void ui_rgb_alert_end(void);
  * and a short cyan flash each time a keep-awake nudge goes out. */
 void ui_rgb_nosleep_key(uint8_t led);
 
+/* Calculator mode on the numpad: dim white digits, amber keys that hold an
+ * operator, green "=", red BKSP. Call before the pomodoro overlay. */
+void ui_rgb_calc(void);
+
 /* Boot confirm screen: everything dark except the confirm key, pulsing
  * red. Call after the other overlays so it wins. */
 void ui_rgb_boot_confirm(void);

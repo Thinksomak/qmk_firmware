@@ -11,10 +11,13 @@
 #include <stdint.h>
 
 /* One layer's legend: header name and 12 key labels (max 6 chars each),
- * left to right, top to bottom. */
+ * left to right, top to bottom, drawn on three fixed columns. Labels are
+ * centred on their column; with numpad set, a label "7 %" is a key and
+ * its hold operator, both left-aligned on their own column. */
 typedef struct {
     const char *name;
     const char *keys[12];
+    bool        numpad;
 } ui_layer_legend_t;
 
 /* Use as a key label to show START / PAUSE / RESUME for the timer key. */
@@ -34,3 +37,7 @@ void ui_oled_render(uint8_t layer, uint8_t layer_count, const ui_layer_legend_t 
 
 /* Call from shutdown_user() before the bootloader jump: shows how to flash. */
 void ui_oled_flash_mode(void);
+
+/* True while the display is off (idle timeout) or showing the screensaver,
+ * as of the last render: a knob twist then only wakes it. */
+bool ui_oled_asleep(void);

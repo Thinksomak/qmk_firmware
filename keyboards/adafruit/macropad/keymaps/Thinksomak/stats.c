@@ -1,6 +1,12 @@
 // Copyright 2026 Somak Mondal <mondalsomak@gmail.com>
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+/*
+ * Pomodoro stats in three scopes (see stats.h). The session scope lives in
+ * RAM; the two persistent scopes live in storage.c's block and are written
+ * by storage_commit() when a phase completes or on a stats clear.
+ */
+
 #include "stats.h"
 #include "storage.h"
 
@@ -9,6 +15,8 @@
 static stats_values_t session;    // since power-up
 static uint32_t       pending_ms; // focus time not yet a whole minute
 
+/* Adds focus time. Whole minutes go to all three scopes; the rest waits
+ * in pending_ms. */
 void stats_add_focus_ms(uint32_t ms) {
     pending_ms += ms;
     if (pending_ms < MS_PER_MIN) return;
@@ -34,6 +42,7 @@ void stats_phase_complete(pomodoro_phase_t phase, bool counted) {
     storage_commit();
 }
 
+/* Clears the "since stats reset" scope and saves at once. */
 void stats_clear_since_reset(void) {
     storage_counters_t *c = storage_since_reset();
     c->focus_min          = 0;
@@ -41,6 +50,7 @@ void stats_clear_since_reset(void) {
     storage_commit();
 }
 
+/* One scope's numbers for the stats view (breaks: the session only). */
 stats_values_t stats_get(stats_scope_t scope) {
     stats_values_t            v = {0};
     const storage_counters_t *c;

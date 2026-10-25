@@ -31,7 +31,7 @@
 #    define NOSLEEP_USE_F15 0
 #endif
 
-void     nosleep_toggle(void);
-bool     nosleep_is_on(void);
+void     nosleep_toggle(void);      // the NO_SLEEP key
+bool     nosleep_is_on(void);       // for the screen and the key's LED
 void     nosleep_task(void);        // housekeeping_task_user
 uint32_t nosleep_since_nudge(void); // ms since the last nudge, UINT32_MAX before the first

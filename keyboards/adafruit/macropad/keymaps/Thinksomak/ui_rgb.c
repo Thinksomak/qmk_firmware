@@ -72,6 +72,8 @@ static void draw_hint(void) {
 }
 #endif
 
+/* On top of the layer colours: the phase-end alert on every key, or the
+ * phase hint on one key. */
 void ui_rgb_pomodoro_overlay(void) {
     switch (pomodoro_alert()) {
         case POMO_ALERT_FOCUS_DONE:
@@ -88,6 +90,7 @@ void ui_rgb_pomodoro_overlay(void) {
 #endif
 }
 
+/* The alert must be seen: RGB on for it if it was off (not saved). */
 void ui_rgb_alert_begin(void) {
     if (!rgb_matrix_is_enabled()) {
         rgb_matrix_enable_noeeprom();
@@ -95,6 +98,7 @@ void ui_rgb_alert_begin(void) {
     }
 }
 
+/* RGB back off if the alert switched it on. */
 void ui_rgb_alert_end(void) {
     if (forced_on) {
         rgb_matrix_disable_noeeprom();
@@ -106,6 +110,8 @@ void ui_rgb_alert_end(void) {
 #define NS_BLINK_MS 400         // length of that blink
 #define NS_FLASH_MS 300         // cyan flash after each keep-awake nudge
 
+/* The No-Sleep key: dark when off; when on, a dim blue with a soft blink
+ * every 2 s and a short cyan flash at each nudge. */
 void ui_rgb_nosleep_key(uint8_t led) {
     if (!nosleep_is_on()) {
         rgb_matrix_set_color(led, 0, 0, 0);
@@ -132,12 +138,39 @@ void ui_rgb_nosleep_key(uint8_t led) {
 /* The confirm key of boot_confirm.c: bottom-right. */
 #define BOOT_CONFIRM_LED LED_K32
 
+/* Calculator mode, keys by role: amber = a digit with an operator on hold,
+ * dim white = the other digits, green = "=" (ENT), red = BKSP / AC. */
+void ui_rgb_calc(void) {
+    // Per key, K00..K32: 0 digit, 1 digit with an operator on hold, 2 "=", 3 BKSP.
+    static const uint8_t PROGMEM role[RGB_MATRIX_LED_COUNT] = {1, 1, 1, 1, 1, 1, 0, 0, 0, 2, 0, 3};
+    uint8_t                      v                          = rgb_matrix_get_val();
+    if (v < 48) v = 48; // keep the hint readable at low brightness
+    for (uint8_t i = 0; i < RGB_MATRIX_LED_COUNT; i++) {
+        switch (pgm_read_byte(&role[i])) {
+            case 0:
+                rgb_matrix_set_color(i, v / 6, v / 6, v / 6);
+                break;
+            case 1:
+                rgb_matrix_set_color(i, v / 2, v / 5, 0);
+                break;
+            case 2:
+                rgb_matrix_set_color(i, 0, v / 2, v / 10);
+                break;
+            default:
+                rgb_matrix_set_color(i, v / 2, 0, 0);
+                break;
+        }
+    }
+}
+
+/* Boot confirm: every key dark, the confirm key pulsing red. */
 void ui_rgb_boot_confirm(void) {
     uint8_t wave = quadwave8((uint8_t)(timer_read32() / 3)); // about 0.8 s per pulse
     rgb_matrix_set_color_all(0, 0, 0);
     rgb_matrix_set_color(BOOT_CONFIRM_LED, scale8(alert_peak(), qadd8(50, scale8(wave, 205))), 0, 0);
 }
 
+/* Flash mode: every key red, sent out now (the main loop stops next). */
 void ui_rgb_flash_mode(void) {
     rgb_matrix_set_color_all(alert_peak(), 0, 0);
     rgb_matrix_update_pwm_buffers();

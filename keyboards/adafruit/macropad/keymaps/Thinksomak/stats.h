@@ -21,7 +21,6 @@ typedef enum {
     STATS_SESSION,     // since power-up, RAM only
     STATS_SINCE_RESET, // persisted, cleared by the stats CLEAR key
     STATS_LIFETIME,    // persisted, never cleared by the keymap
-    STATS_SCOPE_COUNT,
 } stats_scope_t;
 
 typedef struct {
