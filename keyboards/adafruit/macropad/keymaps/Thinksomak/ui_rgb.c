@@ -18,7 +18,29 @@
 #define PULSE_MS 1200   // break-done double-pulse period
 #define ROW_DELAY_MS 90 // break-done sweep delay per row
 
-static bool forced_on = false;
+/* Who needs the lights on right now, even if the user switched RGB off:
+ * the pomodoro alert, the Host Power menu or countdown. */
+enum { HOLD_ALERT = 1 << 0, HOLD_POWER = 1 << 1 };
+static uint8_t holders;
+static bool    switched_on; // RGB was off and is on only for the holders
+
+/* RGB on (not saved) while someone holds it, and back off when the last
+ * one lets go, but only if it was off before. */
+static void hold_lights(uint8_t who, bool on) {
+    if (on) {
+        if (!holders && !rgb_matrix_is_enabled()) {
+            rgb_matrix_enable_noeeprom();
+            switched_on = true;
+        }
+        holders |= who;
+    } else if (holders & who) {
+        holders &= (uint8_t)~who;
+        if (!holders && switched_on) {
+            rgb_matrix_disable_noeeprom();
+            switched_on = false;
+        }
+    }
+}
 
 /* Alert brightness follows the user's RGB brightness, with a floor so the
  * alert stays visible when the LEDs are turned down very low. */
@@ -92,18 +114,33 @@ void ui_rgb_pomodoro_overlay(void) {
 
 /* The alert must be seen: RGB on for it if it was off (not saved). */
 void ui_rgb_alert_begin(void) {
-    if (!rgb_matrix_is_enabled()) {
-        rgb_matrix_enable_noeeprom();
-        forced_on = true;
-    }
+    hold_lights(HOLD_ALERT, true);
 }
 
-/* RGB back off if the alert switched it on. */
+/* RGB back off if only the alert needed it. */
 void ui_rgb_alert_end(void) {
-    if (forced_on) {
-        rgb_matrix_disable_noeeprom();
-        forced_on = false;
-    }
+    hold_lights(HOLD_ALERT, false);
+}
+
+/* The Host Power menu and countdown must be seen too. Called every tick
+ * with whether one shows; only a change does anything. */
+void ui_rgb_hold_for_host_power(bool on) {
+    hold_lights(HOLD_POWER, on);
+}
+
+/* The cancel key of the Host Power menu and countdown: top-right, where 9
+ * is on the numpad. */
+#define HOST_POWER_CANCEL_LED LED_K02
+
+/* Host Power menu or countdown: every key a vivid red, whatever the RGB
+ * brightness is set to, so it is plain the PC is about to go off; the
+ * cancel key green, steady in the menu and pulsing during a countdown
+ * (about once a second). */
+void ui_rgb_host_power(bool counting) {
+    uint8_t g = 255;
+    if (counting) g = qadd8(60, scale8(quadwave8((uint8_t)(timer_read32() / 4)), 195));
+    rgb_matrix_set_color_all(255, 0, 0);
+    rgb_matrix_set_color(HOST_POWER_CANCEL_LED, 0, g, 0);
 }
 
 #define NS_BLINK_PERIOD_MS 2000 // one soft blink every 2 s

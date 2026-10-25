@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 /*
- * Pomodoro LED overlay: phase-end alerts and the dim "running" hint.
- * Drawn from the RGB matrix indicator callback, so it sits on top of
- * whatever is shown and disappears by itself. Nothing is saved to EEPROM.
+ * LED overlays: the pomodoro alerts and its dim "running" hint, the No-Sleep
+ * key, the calculator keys, the Host Power menu and countdown, the boot
+ * confirm and flash mode. Drawn from the RGB matrix indicator callback, so
+ * they sit on top of whatever is shown and go by themselves. Nothing is
+ * saved to EEPROM.
  */
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 
 /* Call last in rgb_matrix_indicators_advanced_user(). */
@@ -17,6 +20,13 @@ void ui_rgb_pomodoro_overlay(void);
  * without saving, and switch it back off afterwards. */
 void ui_rgb_alert_begin(void);
 void ui_rgb_alert_end(void);
+
+/* Host Power: the same for its menu and countdown (call every tick with
+ * whether one shows), and their lights: every key vivid red, the cancel
+ * key (top-right) green, pulsing while counting. Call after the pomodoro
+ * overlay. */
+void ui_rgb_hold_for_host_power(bool on);
+void ui_rgb_host_power(bool counting);
 
 /* No-Sleep key light, for the layer that has the No-Sleep key. Dark while
  * No-Sleep is off. While on: steady dim blue, a soft blue blink every 2 s,

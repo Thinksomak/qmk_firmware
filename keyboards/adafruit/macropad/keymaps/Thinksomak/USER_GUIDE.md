@@ -11,7 +11,8 @@ This guide covers every key, screen and setting of that firmware.
 2. [Quick start](#2-quick-start)
 3. [Layer reference](#3-layer-reference)
 4. [Pomodoro timer](#4-pomodoro-timer)
-5. [PC stats (SYSINFO)](#5-pc-stats-sysinfo)
+5. [PC stats (SYSINFO)](#5-pc-stats-sysinfo), and
+   [Host Power: shut down or restart the PC](#55-host-power-shut-down-or-restart-the-pc)
 6. [Numpad holds and the calculator](#6-numpad-holds-and-the-calculator)
 7. [No-Sleep](#7-no-sleep)
 8. [Lights (RGB)](#8-lights-rgb)
@@ -33,11 +34,12 @@ this firmware it is six keypads in one, chosen with the knob:
 | MACRO | typing shortcuts: `$`, `%`, a SQL template, two secure macro keys, RUN |
 | MEDIA | play / pause, previous / next track, stop, volume |
 | NAV | arrows, Page Up / Down, Home / End, Tab, Shift+Tab, Delete |
-| SYSTEM | Task Manager, This PC, No-Sleep, PC stats, light controls, bootloader |
+| SYSTEM | Task Manager, PC shutdown / restart, No-Sleep, PC stats, light controls, bootloader |
 | POMODORO | a focus timer (25 / 5 / 15 minutes by default) with stats |
 
 It also shows live PC stats (CPU, memory, disk, network, GPU) sent by a
-small program on the PC, and can keep the PC awake.
+small program on the PC, can keep the PC awake and, if you allow it on
+the PC, shut it down or restart it (Host Power, §5.5).
 
 ### Hardware
 
@@ -97,6 +99,8 @@ small agent program.
   layer again.
 * **Pressing the knob** is Mute on every layer except POMODORO, where it
   opens *Adjust time*.
+* **The POWER menu (§5.5) ignores the knob**, twist and press, so nothing
+  changes by accident while it is open.
 * **While the screen is off or shows the screensaver, the first twist only
   wakes it**, so you never change layer without seeing it. Keys wake the
   screen and do their job at once.
@@ -112,6 +116,8 @@ small agent program.
 | PC stats view | SYSTEM → **SYSINF** | **SYSINF** again, or press the knob |
 | PC stats setup | in the stats view, the top-right key | top-left = save, top-right = cancel, 30 s untouched = cancel |
 | Bootloader confirm | SYSTEM → **BOOT** | bottom-right key = flash mode; anything else = cancel |
+| Host Power menu | SYSTEM → **POWER** | top-right key = cancel, 10 s without a key = cancel; top-left / top-middle start a shutdown / restart countdown (§5.5) |
+| Host Power countdown | Shutdown or Restart in the menu | top-right key on any layer = cancel (§5.5) |
 
 ### Reading the screen
 
@@ -251,7 +257,7 @@ Knob: twist = layer, press = Mute.
 
 | | Left | Middle | Right |
 |---|---|---|---|
-| **Row 1** | TSKMGR (Ctrl+Shift+Esc) | MYPC (opens This PC) | BOOT (bootloader, §10) |
+| **Row 1** | TSKMGR (Ctrl+Shift+Esc) | POWER (shut down / restart menu, §5.5) | BOOT (bootloader, §10) |
 | **Row 2** | NS (No-Sleep, §7) | SYSINF (PC stats, §5) | RGB on / off |
 | **Row 3** | MODE+ | BRI+ | SPD+ |
 | **Row 4** | MODE− | BRI− | SPD− |
@@ -260,6 +266,8 @@ Knob: twist = layer, press = Mute.
   (on / off, effect number, brightness).
 * The BOOT key blinks red; the NS key shows No-Sleep's state (§7).
 * The NS key's label reads `NS ON` or `NS OFF`.
+* POWER opens the Host Power menu (§5.5). It works only with the PC agent
+  running and Host Power turned on in its settings.
 * Knob: twist = layer, press = Mute.
 
 ### 3.6 POMODORO
@@ -410,7 +418,8 @@ are lost).
 
 The macropad can show your PC's CPU, memory, disk, network and (NVIDIA)
 GPU load. A small program on the PC, the **agent**, sends the numbers over
-USB once a second. Nothing is read back from the keyboard.
+USB once a second. The same agent carries out Host Power (§5.5) when you
+allow it; that is the only thing it ever reads from the keyboard.
 
 ### 5.1 Installing the agent
 
@@ -462,6 +471,8 @@ The agent's files are in the repository at
 | `gpu` | `off` | `nvidia` adds GPU load (needs the NVIDIA driver's `nvidia-smi`) |
 | `nic` | empty | one network adapter by its Windows name, e.g. `Wi-Fi`; empty = all |
 | `log_level` | `INFO` | `DEBUG`, `INFO` or `WARNING` |
+| `allow_power_commands` | `false` | `true` lets the POWER menu shut down or restart this PC (§5.5) |
+| `power_delay` | `15` | Host Power countdown in seconds, 5–99 (never 0) |
 | `vid`, `pid`, `usage_page`, `usage` | macropad values | only change if the USB IDs change |
 
 The log is in `%LOCALAPPDATA%\MacropadSysinfo\agent.log`.
@@ -474,7 +485,7 @@ press. Turn pages with the knob or the top-left (◀) / top-middle (▶) keys.
 | Key (SYSTEM position) | In the view |
 |---|---|
 | TSKMGR | ◀ previous page |
-| MYPC | ▶ next page |
+| POWER | ▶ next page (close the view to open the Host Power menu) |
 | BOOT | **Setup** (§5.3) |
 | SYSINF | close |
 | NS, RGB and the RGB keys | keep their normal job |
@@ -542,8 +553,120 @@ closes without saving.
 Screensaver details: every 30 s the picture moves a pixel sideways and
 every 2 minutes a row up or down, so no pixel stays lit in one place. The
 bottom line keeps the pomodoro time and icons. A pomodoro alert always
-wins. The saver never covers an open screen (calculator, settings, stats).
+wins, and a Host Power countdown (§5.5) shows over the saver. The saver
+never covers an open screen (calculator, settings, stats).
 Without the agent there is no saver or strip.
+
+### 5.5 Host Power: shut down or restart the PC
+
+SYSTEM → **POWER** opens a menu that shuts down or restarts the PC. A
+keyboard cannot do that by itself, so the macropad asks the PC agent
+(§5.1), which runs Windows' own `shutdown` command.
+
+**It is off until you turn it on in the agent's settings** (see *Turning
+it on*, below). Until then the menu answers `Disabled in agent config`.
+
+> **Warning: open apps are closed without asking.** When the countdown
+> ends, Windows closes every open app without offering to save (a
+> `shutdown` with a delay always forces apps closed). Unsaved work is
+> lost. Save first, or cancel. Try Restart for the first time with nothing
+> important open.
+
+**The menu**
+
+```
+┌──────────────────────────────┐
+│▓HOST POWER▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓│  header: no layer dots, the knob does nothing
+│ [7] Shutdown                 │
+│ [8] Restart                  │
+│ [9] Cancel                   │
+│                              │
+│ PC agent connected           │  is the agent running?
+│ Closes in 7 s                │  or the PC's answer
+└──────────────────────────────┘
+```
+
+| Key | In the menu |
+|---|---|
+| Row 1 left (7) | **Shutdown**: asks the PC, then counts down |
+| Row 1 middle (8) | **Restart**: asks the PC, then counts down |
+| Row 1 right (9) | **Cancel**: closes the menu |
+| every other key, the knob | nothing |
+
+* The numbers are those of the NUMPAD keys in the same places.
+* The menu closes by itself after **10 seconds** without a key.
+* For the first half second Shutdown and Restart do nothing: POWER sits
+  where Restart is, so a double tap on POWER can never restart the PC.
+* Every key lights red, the cancel key green, at full brightness.
+* The two bottom lines say whether the agent is running
+  (`PC agent connected` / `PC agent not running`) and when the menu
+  closes; after Shutdown or Restart they show the PC's answer:
+
+| Message | Meaning |
+|---|---|
+| `Asking the PC...` | the request is out; the answer comes within 2 s |
+| `Host agent not responding` | no answer within 2 s: the agent is not running, or it is older than Host Power (rebuild it, §5.1) |
+| `Disabled in agent config` | Host Power is off in the agent's settings (the default) |
+| `The PC refused it, see the agent log` | Windows said no, for example because a shutdown is already scheduled; the log says why |
+
+**The countdown**
+
+When the PC has accepted, the menu gives way to the countdown:
+
+```
+┌──────────────────────────────┐
+│▓SHUTDOWN▓▓▓▓▓▓▓▓▓▓▓(●○○○○○)▓▓│  layer dots: the knob still changes layer
+│                              │
+│              12              │  seconds left, in large clock digits
+│                              │
+│    Shutting down in 12 s     │
+│    Top-right key: cancel     │
+└──────────────────────────────┘
+```
+
+* It shows over every layer, the SYSINFO view and the screensaver, and
+  keeps the screen on. Open screens (pomodoro settings, stats, adjust,
+  alerts, SYSINFO setup, the calculator) stay on top until you close them;
+  the lights show the countdown all the same.
+* Every key is red and the top-right key pulses green.
+* **Cancel: the top-right key, on any layer** (even in the calculator,
+  where it is 9 otherwise). The screen shows `Cancelling...`, then
+  `Cancelled — The PC stays on.` for 3 seconds.
+* Every other key and the knob work as usual meanwhile.
+* The length is the agent's `power_delay` (default 15 s). The macropad
+  counts from the moment it asked, so it reaches 0 just before the PC acts,
+  never after.
+* At 0 the screen shows `Shutting down now` / `Restarting now`. If the
+  macropad still has power once the PC is off (some PCs keep USB powered),
+  it goes back to normal after a minute.
+* `! Cancel unconfirmed`: the agent did not confirm the cancel, so the PC
+  may still go off. Press the top-right key again, or on the PC press
+  Win+R, type `shutdown /a`, Enter. That command cancels from the PC side
+  at any time during the countdown.
+
+**Turning it on** (on the PC)
+
+1. If your agent is older than this feature, rebuild and replace it
+   (§5.1, and *Updating an installed exe* in `host/README.md`).
+2. In `macropad_sysinfo.ini` next to the agent, in the `[power]` section:
+   ```ini
+   allow_power_commands = true
+   power_delay = 15        ; seconds, 5 to 99
+   ```
+3. Restart the agent (`--stop`, then start it). Its log then says
+   `Host Power: on, 15 s delay`.
+
+The agent runs only these, each shutdown or restart with a note for
+Windows' own message:
+
+| Macropad | Command on the PC |
+|---|---|
+| Shutdown | `shutdown /s /t <power_delay>` |
+| Restart | `shutdown /r /t <power_delay>` |
+| Cancel | `shutdown /a`, always carried out, even with Host Power off |
+
+The macropad asks for 15 s, but `power_delay` decides. Every request and
+its outcome goes into the agent's log.
 
 ---
 
@@ -723,6 +846,8 @@ are dark except:
 | calculator key colours | in calculator mode (§6) |
 | bottom-right key, dim colour | while a pomodoro phase is loaded (§4.6) |
 | green breathing / amber pulses on all keys | pomodoro alerts (§4.6) |
+| all keys red, top-right key green | Host Power menu (§5.5) |
+| all keys red, top-right key pulsing green | Host Power countdown (§5.5) |
 | bottom-right key pulsing red, others dark | bootloader confirm (§10) |
 | all keys red | flash mode (§10) |
 
@@ -744,8 +869,9 @@ Notes:
   Brightness sets how bright the alerts, the pomodoro hint, the No-Sleep
   key and the calculator colours are (with a minimum, so they never
   vanish). The layer key is always full colour.
-* With RGB off, the keys stay dark except during a pomodoro alert, which
-  switches the lights on for the alert only.
+* With RGB off, the keys stay dark except during a pomodoro alert or Host
+  Power, which switch the lights on while they last.
+* Host Power's red and green are always at full brightness.
 * Light settings are saved automatically.
 
 ---
@@ -763,6 +889,7 @@ Notes:
 | Light on/off, brightness, effect, speed | yes | by QMK, when changed |
 | Calculator | no | kept until power-off |
 | No-Sleep | no | off at every power-up |
+| Host Power | no | nothing on the macropad; on / off and the delay are in the agent's settings file (§5.5) |
 | Key layout (VIA) | yes | see below |
 
 * Nothing is written every second or per key press; writes happen only
@@ -844,7 +971,7 @@ not in the repository; a build needs that file.
 | Problem | Cause and fix |
 |---|---|
 | A digit came out as an operator | the key was held longer than 0.25 s; tap a little quicker |
-| The knob did not change layer | a sub-mode is open (± or a page number in the header, or CALC); close it. If the screen was dark or showing the screensaver, the first twist only woke it |
+| The knob did not change layer | a sub-mode is open (± or a page number in the header, CALC, or HOST POWER); close it. If the screen was dark or showing the screensaver, the first twist only woke it |
 | Keys do the old thing after flashing | check the firmware date at power-up; the built-in layout reloads only when it changed in code; remaps made in VIA are replaced then |
 | SYSINFO says NO HOST | start the agent; `main.py --list` must show an interface with usage `FF60/61`; after the PC wakes, the agent reconnects within seconds |
 | No GPU value | set `gpu = nvidia` in `macropad_sysinfo.ini` (NVIDIA cards only) |
@@ -855,13 +982,24 @@ not in the repository; a build needs that file.
 | Lights all off | RGB is off: SYSTEM → RGB |
 | pip fails with CERTIFICATE_VERIFY_FAILED | an antivirus scans Python's HTTPS; see `host/README.md` |
 | The PC does not see the macropad | try another cable (some are charge-only) or port |
+| POWER menu: `Host agent not responding` | the agent is not running, or it is older than Host Power: rebuild and replace it (§5.1) |
+| POWER menu: `Disabled in agent config` | set `allow_power_commands = true` in the agent's settings and restart the agent (§5.5) |
+| POWER menu: `The PC refused it` | Windows said no (for example, a shutdown is already scheduled); the agent's log has the reason |
+| Every key red, top-right green | a Host Power menu or countdown is open; the top-right key cancels (§5.5) |
+| `Cancel unconfirmed` | the PC may still shut down: on the PC press Win+R, type `shutdown /a`, Enter |
 
 ### 11.2 FAQ
 
 **Does it need software on the PC?** No, except the agent for PC stats.
 
-**Does it work on Mac or Linux?** The keys do (some shortcuts are
-Windows-specific: TSKMGR, MYPC). The agent is written for Windows.
+**Does it work on Mac or Linux?** The keys do (TSKMGR's shortcut is
+Windows-specific). The agent, and with it PC stats and Host Power, is
+written for Windows.
+
+**Can a stray key press turn my PC off?** Not unless you turned Host Power
+on in the agent's settings. Even then it takes POWER and then Shutdown or
+Restart (ignored for half a second after the menu opens), and the
+countdown that follows can be cancelled with the top-right key.
 
 **Can I change the keys?** Yes, in VIA, or in `keymap.c` and rebuild.
 
@@ -889,6 +1027,7 @@ pointer ends where it was.
 | Pomodoro settings / SYSINFO setup | −1 / +1 | next field |
 | Adjust time | −1 / +1 minute | done |
 | Pomodoro stats / SYSINFO view | page | close |
+| POWER menu | nothing | nothing |
 | Screen off / screensaver | wakes it only | wakes it and mutes at once |
 
 **Layers** (row 1 → row 4, left / middle / right)
@@ -899,7 +1038,7 @@ pointer ends where it was.
 | MACRO | $ % SQL | — | — | TCS MACE RUN |
 | MEDIA | — | · Stop · | Prev Play Next | Vol− Mute Vol+ |
 | NAV | PgUp ↑ PgDn | ← ↓ → | Home · End | S-Tab Tab Del |
-| SYSTEM | TaskMgr MyPC Boot | NS SysInfo RGB | Mode+ Bri+ Spd+ | Mode− Bri− Spd− |
+| SYSTEM | TaskMgr Power Boot | NS SysInfo RGB | Mode+ Bri+ Spd+ | Mode− Bri− Spd− |
 | POMODORO | Start Skip Reset | Edit Adjust Stats | Focus Break Long | Auto Undo Cycle |
 
 **Calculator** (hold ENT 0.4 s on NUMPAD)
@@ -917,6 +1056,11 @@ pointer ends where it was.
 **Bootloader**: SYSTEM → BOOT → bottom-right key. Or double-tap the side
 reset button.
 
+**Host Power** (agent with `allow_power_commands = true`): SYSTEM → POWER →
+top-left = shut down, top-middle = restart, top-right = cancel. During the
+countdown the top-right key cancels on any layer. Open apps are closed
+without saving when it ends.
+
 ---
 
 ## 12. Specifications and glossary
@@ -930,24 +1074,26 @@ reset button.
 | Keys | 12, plus a rotary encoder with push switch |
 | Display | 128 × 64 monochrome OLED (SH1106), SPI |
 | Lights | 12 RGB LEDs, one per key |
-| USB | USB-C; keyboard, media keys, mouse (No-Sleep), Raw HID (VIA, PC stats) |
+| USB | USB-C; keyboard, media keys, mouse (No-Sleep), Raw HID (VIA, PC stats, Host Power) |
 | USB IDs | VID 0x239A, PID 0x0108 |
 | Firmware | QMK, keymap Thinksomak, VIA enabled, 7 VIA layers (6 used) |
 | Saved data | 64-byte settings block (pomodoro, stats, SYSINFO) + QMK's own settings |
 | Hold time | 0.25 s (Enter and Backspace 0.4 s) |
 | Screen sleep | 10 min without input (SAVER style: its own times) |
-| PC agent | Windows, Python 3.8+ or a single exe; 1 packet per second (32 bytes) |
+| PC agent | Windows, Python 3.8+ or a single exe; 1 packet per second (32 bytes); Host Power answers within 2 s |
+| Host Power | off by default (agent setting); countdown 15 s by default (5–99 s); menu closes after 10 s |
 
 ### 12.2 Glossary
 
 | Term | Meaning |
 |---|---|
 | Layer | one of the six key sets, chosen with the knob |
-| Sub-mode | a screen that takes over the keys or knob for a while (calculator, settings, stats, adjust, SYSINFO) |
+| Sub-mode | a screen that takes over the keys or knob for a while (calculator, settings, stats, adjust, SYSINFO, POWER menu) |
 | Tap / hold | a quick press / a press held past the hold time |
 | Tap dance | a key that does different things for 1, 2 or 3 quick taps or a hold |
 | Secure macro key | a key that types stored sign-in text |
-| Agent | the PC program that sends stats to the macropad |
+| Agent | the PC program that sends stats to the macropad and carries out Host Power |
+| Host Power | shutting down or restarting the PC from the macropad (§5.5), through the agent |
 | NO HOST | the macropad gets no stats from the PC |
 | Strip / screensaver | the two ways stats show outside the SYSINFO view |
 | Phase | one focus, short break or long break of the pomodoro timer |

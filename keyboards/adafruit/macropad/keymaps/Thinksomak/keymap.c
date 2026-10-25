@@ -12,11 +12,14 @@
  *     (pomodoro EDIT / STATS, SYSINFO view / SETUP)
  *   - the OLED legend of each layer, and the layer colour on the LEDs
  *   - the tap dances of the MACRO layer (secure macro keys and RUN)
+ *   - the POWER key's menu, which shuts down or restarts the PC through the
+ *     PC agent (hostpower.c)
  *   - process_record_user, which hands every key event to the modules in
  *     a fixed order (see there)
  *   - the reload of VIA's keymap copy whenever the keymap in code changes
  * The modules themselves: pomodoro.c, stats.c, storage.c, nosleep.c,
- * boot_confirm.c, numpad_ops.c + calc.c, sysinfo.c, ui_oled.c, ui_rgb.c.
+ * boot_confirm.c, numpad_ops.c + calc.c, sysinfo.c, hostpower.c, ui_oled.c,
+ * ui_rgb.c.
  */
 
 #include QMK_KEYBOARD_H
@@ -28,6 +31,7 @@
 #include "stats.h"
 #include "storage.h"
 #include "sysinfo.h"
+#include "hostpower.h"
 #include "ui_oled.h"
 #include "ui_rgb.h"
 
@@ -51,7 +55,8 @@ enum custom_keycodes {
     PM_UNDO,             // pomodoro: undo the last skip / reset / jump / new cycle
     PM_CYCLE,            // pomodoro: new cycle (back to READY)
     SYS_BOOT,            // bootloader, after a confirm screen (boot_confirm.c)
-    SYS_INFO             // SYSINFO view: PC stats from the host agent (sysinfo.c)
+    SYS_INFO,            // SYSINFO view: PC stats from the host agent (sysinfo.c)
+    HOST_PWR             // POWER menu: shut down / restart the PC through the agent (hostpower.c)
 };
 #define PM_TOGG KC_PMDRO
 
@@ -102,7 +107,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     ),
     [L_SYSTEM] = LAYOUT(              // system on top, RGB below: + on row 3, - on row 4
                                       KC_MUTE,
-        TSK_MGR,      KC_MYCM,        SYS_BOOT,
+        TSK_MGR,      HOST_PWR,       SYS_BOOT,
         NO_SLEEP,     SYS_INFO,       RM_TOGG,
         RM_NEXT,      RM_VALU,        RM_SPDU,
         RM_PREV,      RM_VALD,        RM_SPDD
@@ -163,7 +168,7 @@ const uint8_t PROGMEM pomodoro_stats_map[MATRIX_ROWS][MATRIX_COLS] = {
 #define I_(a) SI_KEY_##a
 const uint8_t PROGMEM sysinfo_view_map[MATRIX_ROWS][MATRIX_COLS] = {
     { I_(NONE),       I_(NONE),       I_(BACK) },         // knob press
-    { I_(PREV),       I_(NEXT),       I_(SETUP) },        // TSKMGR  MYPC    BOOT
+    { I_(PREV),       I_(NEXT),       I_(SETUP) },        // TSKMGR  POWER   BOOT
     { I_(PASS),       I_(BACK),       I_(PASS) },         // NS      SYSINF  RGB
     { I_(PASS),       I_(PASS),       I_(PASS) },         // MODE+   BRI+    SPD+
     { I_(PASS),       I_(PASS),       I_(PASS) },         // MODE-   BRI-    SPD-
@@ -173,7 +178,7 @@ const uint8_t PROGMEM sysinfo_view_map[MATRIX_ROWS][MATRIX_COLS] = {
  * Knob: turn = -1 / +1, press = next field. */
 const uint8_t PROGMEM sysinfo_setup_map[MATRIX_ROWS][MATRIX_COLS] = {
     { I_(NONE),       I_(NONE),       I_(NEXT_FIELD) },   // knob press
-    { I_(SAVE),       I_(PREV_FIELD), I_(CANCEL) },       // TSKMGR  MYPC    BOOT
+    { I_(SAVE),       I_(PREV_FIELD), I_(CANCEL) },       // TSKMGR  POWER   BOOT
     { I_(DEFAULT),    I_(NEXT_FIELD), I_(NONE) },         // NS      SYSINF  RGB
     { I_(DEC1),       I_(NONE),       I_(INC1) },         // MODE+   BRI+    SPD+
     { I_(DEC5),       I_(NONE),       I_(INC5) },         // MODE-   BRI-    SPD-
@@ -242,8 +247,9 @@ bool rgb_matrix_indicators_advanced_user(uint8_t led_min, uint8_t led_max) {
         default:
             break;
     }
-    ui_rgb_pomodoro_overlay();                        // pomodoro hint / alert on top of everything
-    if (boot_confirm_active()) ui_rgb_boot_confirm(); // ...and the boot confirm above that
+    ui_rgb_pomodoro_overlay();                                                                  // pomodoro hint / alert on top of everything
+    if (hostpower_menu_open() || hostpower_counting()) ui_rgb_host_power(hostpower_counting()); // then the POWER menu or countdown
+    if (boot_confirm_active()) ui_rgb_boot_confirm();                                           // ...and the boot confirm above that
     return false;
 }
 #endif
@@ -481,12 +487,17 @@ void housekeeping_task_user(void) {
     boot_confirm_task();
     numpad_ops_task();
     sysinfo_task();
+    hostpower_task();
+#ifdef RGB_MATRIX_ENABLE
+    ui_rgb_hold_for_host_power(hostpower_menu_open() || hostpower_counting()); // its lights, even with RGB off
+#endif
 }
 
-/* Raw HID: VIA hands every packet here first. Only the SYSINFO command
- * (0xC5) is taken; everything else goes on to VIA as usual. */
+/* Raw HID: VIA hands every packet here first. Only the SYSINFO stats
+ * (0xC5) and the agent's Host Power replies (0xC7) are taken; everything
+ * else goes on to VIA as usual. */
 bool via_command_kb(uint8_t *data, uint8_t length) {
-    return sysinfo_receive(data, length);
+    return sysinfo_receive(data, length) || hostpower_receive(data, length);
 }
 
 /* ---- Key events -------------------------------------------------------------
@@ -495,10 +506,12 @@ bool via_command_kb(uint8_t *data, uint8_t length) {
  *   1. boot confirm      owns every key while its screen is open
  *   2. sleeping screen   a twist only wakes it (a twist you cannot see would
  *                        change layer); keys wake it and act
- *   3. pomodoro          its keys, the alert, its EDIT / STATS / ADJUST modes
- *   4. SYSINFO           its view and SETUP (on the SYSTEM layer)
- *   5. numpad            operators on hold, calculator mode
- *   6. this keymap's own keycodes, below
+ *   3. Host Power        every key and the knob while its menu is open; the
+ *                        top-right key, on any layer, while a countdown runs
+ *   4. pomodoro          its keys, the alert, its EDIT / STATS / ADJUST modes
+ *   5. SYSINFO           its view and SETUP (on the SYSTEM layer)
+ *   6. numpad            operators on hold, calculator mode
+ *   7. this keymap's own keycodes, below
  * Each open mode takes the knob's twist for its own values and lets go of it
  * the moment it closes, whatever closes it: the mode is worked out from what
  * is open, so no knob state is kept here. */
@@ -507,6 +520,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
 #ifdef OLED_ENABLE
     if (IS_ENCODEREVENT(record->event) && ui_oled_asleep()) return false;
 #endif
+    if (!hostpower_process_record(record)) return false;
     if (!pomodoro_process_record(pomodoro_cmd(keycode), keycode, record)) return false;
     if (!sysinfo_process_record(record)) return false;
     if (!numpad_ops_process_record(keycode, record)) return false;
@@ -517,6 +531,9 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
             return false;
         case SYS_INFO:
             if (record->event.pressed) sysinfo_toggle_view(); // inside the view this key is BACK
+            return false;
+        case HOST_PWR:
+            if (record->event.pressed) hostpower_open_menu();
             return false;
         case KC_LUP:
             if (record->event.pressed) step_layer(1);
@@ -596,7 +613,7 @@ static const ui_layer_legend_t layer_legends[] = {
                              "\x1b",   "\x19",  "\x1a",
                              "HOME",   NULL,    "END",
                              "S-TAB",  "TAB",   "DEL"}},
-    [L_SYSTEM] = {"SYSTEM", {"TSKMGR", "MYPC",  "BOOT",
+    [L_SYSTEM] = {"SYSTEM", {"TSKMGR", "POWER", "BOOT",
                              UI_LEGEND_NOSLEEP, "SYSINF", "RGB",
                              "MODE+",  "BRI+",  "SPD+",
                              "MODE-",  "BRI-",  "SPD-"}},

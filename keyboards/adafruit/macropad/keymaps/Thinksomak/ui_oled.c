@@ -26,6 +26,7 @@
 #include "boot_confirm.h"
 #include "numpad_ops.h"
 #include "sysinfo.h"
+#include "hostpower.h"
 #include "version.h"
 
 /* The OLED driver keeps its font to itself (static), so the 2x calculator
@@ -39,7 +40,9 @@
 #define MAX_PIPS 8                  // most session pips on the clock screen
 #define UI_STATUS_CAPS 0x80         // internal: Caps Lock is on
 
-enum { SCR_NONE, SCR_LAYER, SCR_POMO, SCR_EDIT, SCR_STATS, SCR_ADJUST, SCR_ALERT, SCR_BOOT, SCR_CALC, SCR_SYSINFO, SCR_SI_SETUP, SCR_SAVER };
+enum { SCR_NONE, SCR_LAYER, SCR_POMO, SCR_EDIT, SCR_STATS, SCR_ADJUST, SCR_ALERT, SCR_BOOT, SCR_CALC, SCR_SYSINFO, SCR_SI_SETUP, SCR_SAVER, SCR_POWER, SCR_POWER_COUNT };
+
+enum { HPF_CANCELLED = 1, HPF_CANCELLING = 2, HPF_UNCONFIRMED = 4 }; // view_t.hp_flags
 
 #define SAVER_SHIFT_MS 30000 // the screensaver picture moves this often (burn-in)
 #define SAVER_PAGE_MS 10000  // its two overview pages, if there are two, take turns this often
@@ -60,7 +63,9 @@ typedef struct {
     char                calc_total[CALC_TEXT_LEN];
     uint8_t             calc_err, calc_result, calc_rounded, calc_lines, calc_first; // calc_first: the line on top
     uint8_t             si_rx, si_live, si_seen, si_strip, si_page, si_pages, si_item, si_items, si_field, si_shift;
-    uint8_t             si_rows, si_slot; // overview rows (view, screensaver); strip group
+    uint8_t             si_rows, si_slot;                               // overview rows (view, screensaver); strip group
+    uint8_t             hp_note, hp_secs, hp_live, hp_action, hp_flags; // Host Power menu and countdown
+    uint16_t            hp_count;
     sysinfo_config_t    si_cfg, si_saved;
 } view_t;
 
@@ -1267,6 +1272,100 @@ static void draw_calc(const view_t *v) {
     cv_flush(1, 7);
 }
 
+/* ---- Host Power ------------------------------------------------------------ */
+
+/* The POWER menu: the top row's keys with their numbers, as on the numpad,
+ * then two status lines: whether the PC agent is there and when the menu
+ * closes by itself, or what the PC answered. */
+static void draw_power_menu(const view_t *v) {
+    static const char *const label[3] = {"Shutdown", "Restart", "Cancel"};
+    header(KNOB_NONE, "HOST POWER", NULL, 0, 0);
+    cv_clear(1, 7);
+    for (uint8_t i = 0; i < 3; i++) {
+        uint8_t y      = (uint8_t)(11 + i * 11);
+        char    num[2] = {(char)('7' + i), '\0'};
+        cv_text(5, y, num);
+        cv_invert(3, 12, y - 1, y + 7); // the key number in a lit box
+        cv_text(17, y, label[i]);
+    }
+    char        secs[TEXT_COLS + 1] = "Closes in ";
+    const char *a = NULL, *b = NULL;
+    switch (v->hp_note) {
+        case HP_NOTE_ASKING:
+            a = "Asking the PC...";
+            break;
+        case HP_NOTE_NO_REPLY:
+            a = "! Host agent";
+            b = "  not responding";
+            break;
+        case HP_NOTE_DISABLED:
+            a = "! Disabled in";
+            b = "  agent config";
+            break;
+        case HP_NOTE_ERROR:
+            a = "! The PC refused it";
+            b = "  see the agent log";
+            break;
+        default:
+            a = v->hp_live ? "PC agent connected" : "PC agent not running";
+            append_num(secs, v->hp_secs);
+            strcat(secs, " s");
+            b = secs;
+            break;
+    }
+    cv_text(3, 45, a);
+    if (b) cv_text(3, 54, b);
+    cv_flush(1, 7);
+}
+
+/* The countdown, over the layer screens, the SYSINFO view and the
+ * screensaver: what will happen, the seconds left in the clock digits and
+ * how to stop it; then "Cancelled" for a moment once the PC confirms. The
+ * keys and the twist work as usual underneath (but for the cancel key),
+ * so the header keeps the layer dots. */
+static void draw_power_count(const view_t *v, uint8_t layer_count) {
+    bool restart = v->hp_action == HP_ACT_RESTART;
+    cv_clear(1, 7);
+    if (v->hp_flags & HPF_CANCELLED) {
+        header(KNOB_NONE, "HOST POWER", NULL, layer_count, v->layer);
+        cv_text2x((uint8_t)((SCREEN_W - text2x_width("Cancelled")) / 2), 17, "Cancelled");
+        cv_center(41, "The PC stays on.");
+        cv_flush(1, 7);
+        return;
+    }
+    header(KNOB_NONE, restart ? "RESTART" : "SHUTDOWN", NULL, layer_count, v->layer);
+
+    uint16_t left = v->hp_count > 999 ? 999 : v->hp_count;
+    uint8_t  d[3], n = 0;
+    do {
+        d[n++] = left % 10;
+        left /= 10;
+    } while (left);
+    uint8_t x = (uint8_t)((SCREEN_W - (n * (BIG_DIGIT_W + 2) - 2)) / 2);
+    for (uint8_t i = 0; i < n; i++, x += BIG_DIGIT_W + 2)
+        for (uint8_t p = 0; p < BIG_PAGES; p++)
+            for (uint8_t c = 0; c < BIG_DIGIT_W; c++)
+                cv_col(x + c, (uint8_t)(8 + p * 8), pgm_read_byte(&big_digit[d[n - 1 - i]][p][c])); // drawn y 9-38
+
+    char line[TEXT_COLS + 1];
+    if (v->hp_count) {
+        strcpy(line, restart ? "Restarting in " : "Shutting down in ");
+        append_num(line, v->hp_count);
+        strcat(line, v->hp_count < 100 ? " s" : "s");
+    } else {
+        strcpy(line, restart ? "Restarting now" : "Shutting down now");
+    }
+    cv_center(43, line);
+    if (v->hp_flags & HPF_CANCELLING) {
+        cv_center(54, "Cancelling...");
+    } else if (v->hp_flags & HPF_UNCONFIRMED) {
+        cv_center(54, "! Cancel unconfirmed");
+    } else if (v->hp_count) {
+        cv_center(54, "Top-right key: cancel");
+    }
+    cv_flush(1, 7);
+}
+
 /* Bootloader confirmation, above everything else. The bar runs down to the
  * automatic cancel. */
 static void draw_boot(const view_t *v) {
@@ -1289,10 +1388,12 @@ void ui_oled_render(uint8_t layer, uint8_t layer_count, const ui_layer_legend_t 
 
     // Sleep after OLED_TIMEOUT without input, even while the clock ticks;
     // with the SYSINFO screensaver, after its own time instead (or never).
-    // Alerts wake the display. This gate, not the driver, decides.
+    // Alerts and Host Power keep the display on. This gate, not the
+    // driver, decides.
     uint32_t idle      = last_input_activity_elapsed();
     uint32_t off_after = sysinfo_screen_off_ms(OLED_TIMEOUT);
-    if (alert == POMO_ALERT_NONE && off_after && idle >= off_after) {
+    bool     power     = hostpower_menu_open() || hostpower_counting() || hostpower_cancelled();
+    if (alert == POMO_ALERT_NONE && !power && off_after && idle >= off_after) {
         if (is_oled_on()) {
             oled_invert(false);
             oled_off();
@@ -1308,6 +1409,8 @@ void ui_oled_render(uint8_t layer, uint8_t layer_count, const ui_layer_legend_t 
     memset(&v, 0, sizeof v);
     if (boot_confirm_active()) {
         v.screen = SCR_BOOT;
+    } else if (hostpower_menu_open()) {
+        v.screen = SCR_POWER; // over an alert too: the menu has the keys
     } else if (alert != POMO_ALERT_NONE) {
         v.screen = SCR_ALERT;
     } else if (pomodoro_is_editing()) {
@@ -1318,10 +1421,12 @@ void ui_oled_render(uint8_t layer, uint8_t layer_count, const ui_layer_legend_t 
         v.screen = SCR_ADJUST;
     } else if (sysinfo_in_setup()) {
         v.screen = SCR_SI_SETUP;
-    } else if (sysinfo_view_open()) {
-        v.screen = SCR_SYSINFO;
     } else if (numpad_calc_active()) {
         v.screen = SCR_CALC;
+    } else if (hostpower_counting() || hostpower_cancelled()) {
+        v.screen = SCR_POWER_COUNT; // over the SYSINFO view, the screensaver and the layers
+    } else if (sysinfo_view_open()) {
+        v.screen = SCR_SYSINFO;
     } else if (sysinfo_saver_due(idle)) {
         v.screen = SCR_SAVER; // over the layer screens only, never over a mode
     } else {
@@ -1419,6 +1524,16 @@ void ui_oled_render(uint8_t layer, uint8_t layer_count, const ui_layer_legend_t 
             v.secs = remaining_secs();
             v.bar  = progress(BAR_W);
             break;
+        case SCR_POWER:
+            v.hp_note = hostpower_menu_note();
+            v.hp_secs = hostpower_menu_secs();
+            v.hp_live = sysinfo_live();
+            break;
+        case SCR_POWER_COUNT:
+            v.hp_action = hostpower_count_action();
+            v.hp_count  = hostpower_count_secs();
+            v.hp_flags  = (uint8_t)((hostpower_cancelled() ? HPF_CANCELLED : 0) | (hostpower_cancelling() ? HPF_CANCELLING : 0) | (hostpower_cancel_unconfirmed() ? HPF_UNCONFIRMED : 0));
+            break;
         case SCR_BOOT:
             v.boot_px = (uint8_t)(boot_confirm_remaining_ms() * BAR_W / BOOT_CONFIRM_TIMEOUT_MS);
             break;
@@ -1469,6 +1584,12 @@ void ui_oled_render(uint8_t layer, uint8_t layer_count, const ui_layer_legend_t 
             break;
         case SCR_ADJUST:
             draw_adjust(&v);
+            break;
+        case SCR_POWER:
+            draw_power_menu(&v);
+            break;
+        case SCR_POWER_COUNT:
+            draw_power_count(&v, layer_count);
             break;
         case SCR_BOOT:
             draw_boot(&v);

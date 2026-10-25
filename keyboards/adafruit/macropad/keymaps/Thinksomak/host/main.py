@@ -8,6 +8,12 @@ CPU %, RAM %, disk read/write and network download/upload rates, and
 optionally NVIDIA GPU %. One 32-byte packet per interval (default 1 s).
 The packet layout is in README.md and in ../sysinfo.h.
 
+Host Power: between packets it listens for the macropad's requests to shut
+down or restart this PC (SYSTEM layer, POWER key) and to cancel that. It
+acts on them only with allow_power_commands = true in the settings (off by
+default), through Windows' own shutdown.exe; a cancel is always carried
+out. Layout in README.md and ../hostpower.h.
+
     python main.py              run (Ctrl+C to stop)
     python main.py --console    also log every packet to the console
     python main.py --dry-run    no device: print the packets instead
@@ -15,7 +21,8 @@ The packet layout is in README.md and in ../sysinfo.h.
     python main.py --stop       stop the agent that is already running
     python main.py --config F   use settings file F
 
-Only numbers are sent. Nothing is read back from the keyboard.
+Only numbers go to the keyboard. The only thing read back is a Host Power
+request.
 """
 
 import argparse
@@ -52,9 +59,23 @@ FLAG_GPU_VALID = 0x01
 FLAG_LEAVING = 0x02
 PACKET_SIZE = 32
 
+# Host Power packets (see ../hostpower.h)
+POWER_REQUEST = 0xC6  # keyboard -> PC
+POWER_REPLY = 0xC7  # PC -> keyboard
+POWER_MAGIC = 0x50  # 'P'
+POWER_PROTOCOL = 1
+ACT_SHUTDOWN, ACT_RESTART, ACT_ABORT = 1, 2, 3
+ST_STARTED, ST_ABORTED, ST_DISABLED, ST_ERROR = 1, 2, 3, 4
+ACTION_NAMES = {ACT_SHUTDOWN: "shutdown", ACT_RESTART: "restart", ACT_ABORT: "cancel"}
+STATUS_NAMES = {ST_STARTED: "started", ST_ABORTED: "cancelled", ST_DISABLED: "disabled", ST_ERROR: "error"}
+POWER_DELAY_DEFAULT, POWER_DELAY_MIN, POWER_DELAY_MAX = 15, 5, 99  # seconds; never 0
+ERROR_NO_SHUTDOWN_IN_PROGRESS = 1116  # shutdown /a when nothing is scheduled
+READ_SLICE = 0.1  # s; how long one read waits, so stop and the next tick stay on time
+
 DEFAULTS = {
     "device": {"vid": "0x239A", "pid": "0x0108", "usage_page": "0xFF60", "usage": "0x61"},
     "agent": {"interval": "1.0", "gpu": "off", "nic": "", "log_level": "INFO"},
+    "power": {"allow_power_commands": "false", "power_delay": str(POWER_DELAY_DEFAULT)},
 }
 
 log = logging.getLogger("sysinfo")
@@ -93,6 +114,22 @@ class Settings:
         self.gpu = agent.get("gpu").strip().lower()
         self.nic = agent.get("nic").strip()
         self.log_level = agent.get("log_level").strip().upper()
+        self.problems = []  # logged once logging is set up
+
+        # Host Power stays off unless the setting clearly says true.
+        power = cp["power"]
+        allow = power.get("allow_power_commands").strip().lower()
+        self.allow_power = allow in ("true", "yes", "on", "1")
+        if allow not in ("true", "yes", "on", "1", "false", "no", "off", "0"):
+            self.problems.append("allow_power_commands = %r is not true or false; Host Power stays off" % allow)
+        try:
+            delay = int(power.get("power_delay"))
+        except ValueError:
+            self.problems.append("power_delay = %r is not a whole number; using %d" % (power.get("power_delay"), POWER_DELAY_DEFAULT))
+            delay = POWER_DELAY_DEFAULT
+        self.power_delay = min(POWER_DELAY_MAX, max(POWER_DELAY_MIN, delay))
+        if self.power_delay != delay:
+            self.problems.append("power_delay = %d is outside %d-%d; using %d" % (delay, POWER_DELAY_MIN, POWER_DELAY_MAX, self.power_delay))
 
 
 def setup_logging(level_name, console):
@@ -304,6 +341,42 @@ def describe(cpu, ram, gpu, rates):
     return "  ".join(parts)
 
 
+def crc8(data):
+    """CRC-8, polynomial 0x07, from 0: the same as the firmware's."""
+    crc = 0
+    for b in data:
+        crc ^= b
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x07) & 0xFF if crc & 0x80 else (crc << 1) & 0xFF
+    return crc
+
+
+def parse_power_request(report):
+    """(sequence, action, delay asked for) from a report the keyboard sent.
+    None when it is not a Host Power request (VIA's replies come in here
+    too); ValueError when it is one but damaged or of another protocol."""
+    r = bytes(report)
+    if len(r) == PACKET_SIZE + 1 and r[0] == 0:  # report ID left in front
+        r = r[1:]
+    if len(r) < 8 or r[0] != POWER_REQUEST:
+        return None
+    if r[1] != POWER_MAGIC or crc8(r[:7]) != r[7]:
+        raise ValueError("damaged request: %s" % r[:8].hex(" "))
+    if r[2] != POWER_PROTOCOL:
+        raise ValueError("request of protocol %d, this agent knows %d: update the agent" % (r[2], POWER_PROTOCOL))
+    return r[3], r[4], r[5] | r[6] << 8
+
+
+def build_power_reply(seq, action, status, delay):
+    """The reply to one request: sequence and action echoed, the status and
+    the delay this PC uses."""
+    p = bytearray(PACKET_SIZE)
+    p[0], p[1], p[2], p[3], p[4], p[5] = POWER_REPLY, POWER_MAGIC, POWER_PROTOCOL, seq & 0xFF, action & 0xFF, status
+    struct.pack_into("<H", p, 6, max(0, min(0xFFFF, delay)))
+    p[8] = crc8(p[:8])
+    return bytes(p)
+
+
 # ---- Device ---------------------------------------------------------------
 
 
@@ -342,6 +415,15 @@ class Device:
         if n is not None and n < 0:
             raise OSError("write failed")
 
+    def read(self, timeout_ms):
+        """One report from the keyboard, or None after timeout_ms. Never pass
+        0: both hid packages then wait for ever."""
+        try:
+            data = self.h.read(64, max(1, int(timeout_ms)))
+        except Exception as e:  # each hid package raises its own error type
+            raise OSError(str(e)) from e
+        return bytes(data) if data else None
+
     def close(self):
         if self.h is not None:
             try:
@@ -349,6 +431,109 @@ class Device:
             except (OSError, ValueError):
                 pass
             self.h = None
+
+
+# ---- Host Power -----------------------------------------------------------
+
+
+class PowerControl:
+    """Shuts down or restarts this PC when the macropad asks, only if the
+    settings allow it, with Windows' own shutdown.exe and nothing else:
+        shutdown   /s /t <delay> /c <note>
+        restart    /r /t <delay> /c <note>
+        cancel     /a   (always allowed: it can only keep the PC on)
+    With /t above 0, Windows implies /f: open apps are closed without
+    asking, so unsaved work is lost. The delay is never under 5 s."""
+
+    def __init__(self, allowed, delay, runner=None):
+        self.allowed = allowed
+        self.delay = min(POWER_DELAY_MAX, max(POWER_DELAY_MIN, int(delay)))
+        self._run = runner or run_shutdown_exe  # tests pass a fake
+
+    def handle(self, action):
+        """Carries out one action: (status, delay in s) for the reply."""
+        if action == ACT_ABORT:
+            code = self._shutdown(["/a"])
+            # 1116: nothing was scheduled, so nothing will happen either.
+            return (ST_ABORTED if code in (0, ERROR_NO_SHUTDOWN_IN_PROGRESS) else ST_ERROR), 0
+        if action not in (ACT_SHUTDOWN, ACT_RESTART):
+            return ST_ERROR, 0
+        if not self.allowed:
+            return ST_DISABLED, 0
+        what = "Shutdown" if action == ACT_SHUTDOWN else "Restart"
+        note = "%s from the macropad in %d s. To cancel: its top-right key, or shutdown /a" % (what, self.delay)
+        code = self._shutdown(["/s" if action == ACT_SHUTDOWN else "/r", "/t", str(self.delay), "/c", note])
+        return (ST_STARTED, self.delay) if code == 0 else (ST_ERROR, 0)
+
+    def _shutdown(self, args):
+        """Exit code of shutdown.exe, or None if it could not run."""
+        try:
+            return self._run(args)
+        except (OSError, subprocess.SubprocessError) as e:
+            log.error("Host Power: shutdown %s failed to run (%s)", args[0], e)
+            return None
+
+    def answer(self, report):
+        """The reply to a Host Power request, or None if the report is not
+        one."""
+        try:
+            req = parse_power_request(report)
+        except ValueError as e:
+            log.warning("Host Power: %s", e)
+            return None
+        if req is None:
+            return None
+        seq, action, asked = req
+        name = ACTION_NAMES.get(action, "unknown action %d" % action)
+        log.debug("Host Power: request %d, %s, %d s asked for", seq, name, asked)
+        status, delay = self.handle(action)
+        if status == ST_STARTED:
+            log.warning("Host Power: %s in %d s, asked by the macropad", name, delay)
+        elif status == ST_DISABLED:
+            log.warning("Host Power: %s asked, but allow_power_commands is off in the settings", name)
+        elif status == ST_ERROR:
+            log.warning("Host Power: %s asked -> error", name)
+        else:
+            log.info("Host Power: %s asked -> %s", name, STATUS_NAMES[status])
+        return build_power_reply(seq, action, status, delay)
+
+
+def run_shutdown_exe(args):
+    """Runs Windows' shutdown.exe with args, as a list (never through a
+    shell), from System32 (never from PATH). Returns its exit code."""
+    if os.name != "nt":
+        raise OSError("Host Power needs Windows")
+    exe = os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "shutdown.exe")
+    # The timeout stays well under the keyboard's HOSTPOWER_LATE_MS (20 s).
+    out = subprocess.run([exe] + list(args), capture_output=True, timeout=10, creationflags=0x08000000)  # CREATE_NO_WINDOW
+    if out.returncode != 0:
+        msg = (out.stderr or out.stdout).decode("oem", "replace").strip()
+        quiet = out.returncode == ERROR_NO_SHUTDOWN_IN_PROGRESS  # nothing to cancel: fine
+        log.log(logging.INFO if quiet else logging.WARNING, "Host Power: shutdown %s: exit code %d %s", args[0], out.returncode, msg)
+    return out.returncode
+
+
+def listen(inst, dev, power, seconds):
+    """Waits like Instance.wait(), and meanwhile answers the macropad's
+    Host Power requests. True if a stop was requested."""
+    end = time.monotonic() + seconds
+    while dev is not None and dev.h is not None:
+        if inst.wait(0):
+            return True
+        left = end - time.monotonic()
+        if left <= 0:
+            return False
+        try:
+            report = dev.read(min(left, READ_SLICE) * 1000)
+            reply = power.answer(report) if report else None
+            if reply:
+                dev.write(reply)
+        except (OSError, ValueError) as e:
+            log.warning("macropad lost (%s); reconnecting", e)
+            dev.close()
+        except Exception:  # keep running whatever happens
+            log.exception("unexpected error; carrying on")
+    return inst.wait(max(0.0, end - time.monotonic()))
 
 
 # ---- Main loop ------------------------------------------------------------
@@ -361,6 +546,7 @@ def run(s, inst, dry_run):
         gpu = GpuPoller(inst.stopping)
         gpu.start()
     dev = None if dry_run else Device(s)
+    power = PowerControl(s.allow_power, s.power_delay)
     seq = 0
     retry_at, backoff, waiting_logged = 0.0, 1.0, False
     next_tick = time.monotonic()
@@ -369,6 +555,10 @@ def run(s, inst, dry_run):
         "started: interval %.2f s, device %04X:%04X usage %04X/%02X%s",
         s.interval, s.vid, s.pid, s.usage_page, s.usage, " (dry run)" if dry_run else "",
     )
+    if s.allow_power:
+        log.info("Host Power: on, %d s delay (allow_power_commands = true)", power.delay)
+    else:
+        log.info("Host Power: off; the macropad's POWER menu gets \"disabled\" (allow_power_commands = false)")
     while True:
         try:
             cpu, ram, rates = sampler.sample()
@@ -403,7 +593,7 @@ def run(s, inst, dry_run):
         delay = next_tick - time.monotonic()
         if delay < -s.interval:  # fell far behind (PC slept): start again from now
             next_tick, delay = time.monotonic(), 0
-        if inst.wait(max(0.0, delay)):
+        if listen(inst, dev, power, max(0.0, delay)):
             break
 
     if dev is not None and dev.h is not None:
@@ -435,6 +625,8 @@ def main():
     s = Settings(args.config or os.path.join(app_dir(), CONFIG_NAME))
     setup_logging(s.log_level, args.console)
     log.info("settings: %s", s.path or "defaults (no %s found)" % CONFIG_NAME)
+    for problem in s.problems:
+        log.warning("settings: %s", problem)
     if psutil is None:
         log.error("psutil is missing: pip install -r requirements.txt")
         return 2

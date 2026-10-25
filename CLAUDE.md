@@ -70,17 +70,18 @@ Modular files in `keyboards/adafruit/macropad/keymaps/Thinksomak/`, each listed 
 | `numpad_ops.c` | numpad keys are `NP(kc)` = `LT(0, kc)`; the hold is intercepted (7 %, 8 /, 9 *, 5 -, 6 +, 0 ., ENT = calculator); per-key tapping terms; `#error` checks on tap-hold options; in calculator mode the twist scrolls the expression by display lines |
 | `calc.c` | desk calculator, pure C (int64 fixed point, 6 decimals): the expression is a list of numbers and operators (`calc_tok_t`, exact values; the oldest folded into `base` past 96 characters) and the value is replayed from it after every key, so Backspace can step back one character or operator at a time; the expression never shows `=`; `calc_display_lines()` breaks the expression into the OLED's 20-character small-font lines (tape style, a new line before each operator); `calc_value_rounded()` drives the `≈` mark, so screen, knob scroll limit and tests share one rule; unit test `tests/run_calc_test.sh` (needs `/mingw64/bin/gcc` in PATH) |
 | `sysinfo.c` | Raw HID receive (`via_command_kb` in keymap.c passes command 0xC5 here), history, SYSINFO view/SETUP, display style OFF / STRIP / SAVER (screensaver) |
+| `hostpower.c` | Host Power: SYSTEM's POWER key opens a menu (top row 7 shutdown / 8 restart / 9 cancel; 0.5 s double-tap guard; 10 s timeout; knob ignored); sends request 0xC6 to the agent and takes its reply 0xC7 (also through `via_command_kb`), with a 2 s reply timeout; then a countdown that overlays layers, the SYSINFO view and the screensaver, cancelled by the top-right key on any layer. Packet layout in `hostpower.h` |
 | `pomodoro.c`, `stats.c`, `nosleep.c`, `boot_confirm.c` | pomodoro timer, stats, keep-awake, two-step bootloader |
 | `storage.c` | the 64-byte EEPROM user datablock, layout 4 (30 bytes free); upgrades the 32-byte layouts 2 and 3 in place, clearing what VIA left in bytes 32-63 |
 | `ui_oled.c`, `ui_rgb.c` | every OLED screen and LED overlay; the screen-off gate and screensaver. Key legends, the calculator and SYSINFO are drawn in an 8-page canvas (`cv_*`) at exact pixel positions; legends sit on three fixed columns centred at x 21 / 64 / 107 |
-| `host/` | PC agent (`main.py`, `macropad_sysinfo.ini`, `build.bat`, README) that sends PC stats over Raw HID |
+| `host/` | PC agent (`main.py`, `macropad_sysinfo.ini`, `build.bat`, `test_agent.py`, README) that sends PC stats over Raw HID and, between packets, answers Host Power requests by running `shutdown.exe` (`/s`, `/r` with `/t`, `/a`); off unless `[power] allow_power_commands = true` |
 | `USER_GUIDE.md` | the user manual: every layer, key, mode, setting, flashing and recovery |
 
-`process_record_user` order matters: boot confirm, the "first twist only wakes" rule, pomodoro, sysinfo, numpad, then the keymap's own keycodes.
+`process_record_user` order matters: boot confirm, the "first twist only wakes" rule, Host Power (its menu takes every key; its countdown takes only the top-right key), pomodoro, sysinfo, numpad, then the keymap's own keycodes.
 
-Knob convention: **the twist always changes the main layer (wrapping); a mode that is open takes it for its own values** (pomodoro edit / stats / adjust / alert, SYSINFO view and SETUP, calculator scroll) and lets go the moment it closes. The mode is worked out from what is open, never stored. The OLED header marks only the exceptions, with a plain glyph at its left: ± where the twist changes a value; stats and SYSINFO show their page number `k/N` on the right instead; the calculator shows a scrollbar while its expression has more than three lines (small expression on top, a divider, then `=` at the left and the value large and right-aligned, stepping down to a medium size when too wide). Main layers show no glyph. While the screen is off or the screensaver shows, the first twist only wakes it; keys wake it and act.
+Knob convention: **the twist always changes the main layer (wrapping); a mode that is open takes it for its own values** (pomodoro edit / stats / adjust / alert, SYSINFO view and SETUP, calculator scroll; the Host Power menu takes it and ignores it) and lets go the moment it closes. A Host Power countdown leaves the twist on layers, so its header keeps the layer dots. The mode is worked out from what is open, never stored. The OLED header marks only the exceptions, with a plain glyph at its left: ± where the twist changes a value; stats and SYSINFO show their page number `k/N` on the right instead; the calculator shows a scrollbar while its expression has more than three lines (small expression on top, a divider, then `=` at the left and the value large and right-aligned, stepping down to a medium size when too wide). Main layers show no glyph. While the screen is off or the screensaver shows, the first twist only wakes it; keys wake it and act.
 
-Host agent: needs Python 3.8+ from python.org (QMK MSYS's Python cannot build psutil). `cd host && py -3 -m venv .venv && .venv\Scripts\pip install -r requirements.txt && .venv\Scripts\python main.py --console`; `build.bat` makes `dist\macropad-sysinfo.exe` (`build.bat --console` for a debug build). `main.py --stop` ends a running agent cleanly; `--dry-run` needs no device.
+Host agent: needs Python 3.8+ from python.org (QMK MSYS's Python cannot build psutil). `cd host && py -3 -m venv .venv && .venv\Scripts\pip install -r requirements.txt && .venv\Scripts\python main.py --console`; `build.bat` makes `dist\macropad-sysinfo.exe` (`build.bat --console` for a debug build). `main.py --stop` ends a running agent cleanly; `--dry-run` needs no device. `python test_agent.py` tests the Host Power part with a fake `shutdown.exe`; it patches `subprocess.run` to fail, so no test can ever shut the PC down. Keep it that way.
 
 ## Repo-specific architecture notes
 
@@ -111,6 +112,14 @@ Host agent: needs Python 3.8+ from python.org (QMK MSYS's Python cannot build ps
 - The keymap blanks every LED each frame (`rgb_matrix_indicators_advanced_user`) and lights only indicators, so the RGB effect itself is never visible; MODE / SPD keys only change the stored effect.
 - Never call `eeconfig_update_user()` in the macropad keymap: the datablock version lives in that word. Inside the 32 bytes use storage.c's layout number, not `EECONFIG_USER_DATA_VERSION` (bumping that wipes settings and stats).
 - From Git Bash, `timeout -s INT` does not reach a native Windows process; stop the agent with `main.py --stop`. `bash --login` in QMK MSYS changes to the home folder, so pass absolute paths.
+
+## Lessons from Host Power (2026-10-25)
+
+- On Windows a keyboard-to-PC Raw HID report reaches every open handle, VIA included. The keyboard sends one only on a key press (Host Power request), never on a timer, so VIA can at worst mistake one for a reply while it is mid-command. PC-to-keyboard reports reach only the keyboard.
+- `via_command_kb()` returning true means VIA sends nothing back, so the agent's stats (0xC5) and Host Power replies (0xC7) produce no echo.
+- hidapi `read(n, 0)` blocks for ever in both Python packages (`hidapi`, the ctypes `hid`); `Device.read()` always passes a timeout of at least 1 ms.
+- `shutdown /t N` with N > 0 implies `/f`: open apps are closed without asking. The agent never adds `/f` itself and keeps the delay at 5-99 s.
+- A screen that has the keys must win the screen: the POWER menu draws above a pomodoro alert, or a key meant to dismiss the alert could restart the PC.
 
 ## Workflow rules
 

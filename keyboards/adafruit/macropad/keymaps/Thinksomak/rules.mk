@@ -16,8 +16,9 @@ SRC += pomodoro.c storage.c stats.c nosleep.c boot_confirm.c ui_oled.c ui_rgb.c
 # Numpad operators on hold, and the calculator (calc.c is pure C, see tests/)
 SRC += numpad_ops.c calc.c
 OPT_DEFS += -DQUICK_TAP_TERM_PER_KEY
-# PC stats over Raw HID; the PC agent is in host/
-SRC += sysinfo.c
+# PC stats over Raw HID, and Host Power (shut down / restart through the
+# same PC agent, which is in host/)
+SRC += sysinfo.c hostpower.c
 
 # EEPROM user datablock: pomodoro settings + stats + SYSINFO settings, 64
 # bytes (see storage.c; it was 32 up to layout 3). Bumping the version makes
