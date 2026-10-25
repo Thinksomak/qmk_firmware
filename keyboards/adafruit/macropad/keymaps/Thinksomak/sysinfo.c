@@ -12,6 +12,8 @@
  *     SETUP --CANCEL, or 30 s untouched--> view (nothing saved)
  *     view --BACK, SYS_INFO or the knob press--> closed
  * In the view the knob turns the pages; in SETUP it changes the value.
+ * The view always has every page. SETUP's SHOW (ALL, one item, or CUSTOM
+ * with a switch per item) chooses what the strip and the screensaver show.
  *
  * Settings are written to EEPROM only on SAVE, and only when they differ
  * from what is stored (storage_commit()).
@@ -275,46 +277,47 @@ static uint8_t bit_count(uint8_t m) {
     return n;
 }
 
-/* Number of items shown. */
-static uint8_t item_count(void) {
-    return bit_count(sysinfo_items());
-}
-
-/* A percentage takes one row and a gap, a rate two rows and a gap, and an
- * overview holds six rows. */
-uint8_t sysinfo_overview_items(uint8_t k) {
-    uint8_t items = sysinfo_items(), load = items & LOAD_ITEMS, rate = items & RATE_ITEMS;
+/* Overview page k of a set of items: all of them on one page when they fit
+ * (a percentage takes one row and a gap, a rate two rows and a gap, a page
+ * holds six rows), otherwise the percentages on the first and the rates on
+ * the second. 0 when there is no such page. */
+static uint8_t overview_of(uint8_t items, uint8_t k) {
+    uint8_t load = items & LOAD_ITEMS, rate = items & RATE_ITEMS;
     if (2 * bit_count(load) + 3 * bit_count(rate) <= 6) return k ? 0 : items;
     return k == 0 ? load : k == 1 ? rate : 0;
 }
 
-/* Overview pages before the single pages: none with one item, else 1 or 2. */
+/* The view's overviews: every item, the GPU while the host sends it. */
+uint8_t sysinfo_overview_items(uint8_t k) {
+    return overview_of(vals.gpu_valid ? ITEMS_ALL : ITEMS_ALL & ~(1 << SI_ITEM_GPU), k);
+}
+
+/* The screensaver's overviews: the items SHOW asks for. */
+uint8_t sysinfo_saver_items(uint8_t k) {
+    return overview_of(sysinfo_items(), k);
+}
+
+/* Overview pages before the item pages: 1 or 2. */
 static uint8_t overview_count(void) {
-    return item_count() < 2 ? 0 : sysinfo_overview_items(1) ? 2 : 1;
+    return sysinfo_overview_items(1) ? 2 : 1;
 }
 
-/* Page order: the overviews, then one page per item in page_order. */
+/* Page order: the overviews, then every item in page_order. The GPU has its
+ * page even when the host does not send it: the page says how to turn it
+ * on. */
 uint8_t sysinfo_page_count(void) {
-    uint8_t n = item_count();
-    return n > 1 ? overview_count() + n : 1;
+    return overview_count() + SI_ITEMS;
 }
 
-/* The page shown, kept in range when the item set changes. */
+/* The page shown, kept in range. */
 uint8_t sysinfo_page(void) {
     return page % sysinfo_page_count();
 }
 
 /* What the page shows: an overview, or one item. */
 uint8_t sysinfo_page_item(void) {
-    uint8_t items = sysinfo_items(), p = sysinfo_page(), ov = overview_count();
-    if (p < ov) return SI_OVERVIEW;
-    p -= ov;
-    for (uint8_t i = 0; i < SI_ITEMS; i++) {
-        uint8_t it = pgm_read_byte(&page_order[i]);
-        if (!(items & (1 << it))) continue;
-        if (p-- == 0) return it;
-    }
-    return SI_OVERVIEW;
+    uint8_t p = sysinfo_page(), ov = overview_count();
+    return p < ov ? SI_OVERVIEW : pgm_read_byte(&page_order[p - ov]);
 }
 
 /* ---- View and SETUP ----------------------------------------------------- */
@@ -340,13 +343,14 @@ sysinfo_field_t sysinfo_setup_field(void) {
     return (sysinfo_field_t)field;
 }
 
-/* SETUP shows a field only where it applies: the custom items with SHOW
- * = CUSTOM, IDLE / SCREEN OFF with SAVER, EVERY / FOR with STRIP. */
+/* SETUP shows STYLE and SHOW always (SHOW can be set before choosing a
+ * style), the custom item switches with SHOW = CUSTOM, IDLE / SCREEN OFF
+ * with SAVER, EVERY / FOR with STRIP. */
 bool sysinfo_field_shown(sysinfo_field_t f) {
     if (f >= SI_FIELD_CPU && f <= SI_FIELD_GPU) return edit.show == SI_SHOW_CUSTOM;
     if (f == SI_FIELD_IDLE || f == SI_FIELD_OFF) return edit.style == SI_STYLE_SAVER;
     if (f == SI_FIELD_EVERY || f == SI_FIELD_FOR) return edit.style == SI_STYLE_STRIP;
-    return true;
+    return true; // STYLE, SHOW
 }
 
 /* A step index kept inside 0..steps-1 (times stop at the ends). */
@@ -365,7 +369,7 @@ static void step_field(int8_t dir) {
 static void set_default(void) {
     if (field == SI_FIELD_SHOW) {
         edit.show = SI_SHOW_ALL;
-    } else if (field <= SI_FIELD_GPU) {
+    } else if (field >= SI_FIELD_CPU && field <= SI_FIELD_GPU) {
         uint8_t bit = (uint8_t)(1 << (field - SI_FIELD_CPU));
         edit.custom = (uint8_t)((edit.custom & ~bit) | (ITEMS_DEFAULT & bit));
         if (!edit.custom) edit.custom = ITEMS_DEFAULT;
@@ -390,7 +394,7 @@ static void adjust(int8_t d) {
     int8_t sign = d > 0 ? 1 : -1;
     if (field == SI_FIELD_SHOW) {
         edit.show = (uint8_t)((edit.show + SI_SHOW_COUNT + sign) % SI_SHOW_COUNT);
-    } else if (field <= SI_FIELD_GPU) {
+    } else if (field >= SI_FIELD_CPU && field <= SI_FIELD_GPU) {
         uint8_t bit = (uint8_t)(1 << (field - SI_FIELD_CPU));
         if ((edit.custom ^ bit) & ITEMS_ALL) edit.custom ^= bit; // never all off
     } else if (field == SI_FIELD_STYLE) {
@@ -423,7 +427,7 @@ static void act(sysinfo_key_t k) {
             break;
         case SI_KEY_SETUP:
             edit  = cfg;
-            field = SI_FIELD_SHOW;
+            field = SI_FIELD_STYLE; // the first field, always shown
             view  = VIEW_SETUP;
             break;
         case SI_KEY_SAVE:

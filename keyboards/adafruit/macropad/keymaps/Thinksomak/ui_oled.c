@@ -1033,29 +1033,27 @@ static void draw_si_rates(sysinfo_item_t it) {
 }
 
 /* The SYSINFO view: header with the page's name and k/N, the page, the
- * usual bottom line. Without a host, a plain message on every page. */
+ * usual bottom line. Without a host, a plain message on every page, under
+ * the same header, so a twist is still seen to turn the pages. */
 static void draw_sysinfo(const view_t *v) {
+    sysinfo_item_t it       = (sysinfo_item_t)v->si_item;
+    char           right[8] = "";
+    if (v->si_pages > 1) {
+        append_num(right, v->si_page + 1);
+        strcat(right, "/");
+        append_num(right, v->si_pages);
+    }
     cv_clear(1, 6);
+    header(KNOB_NONE, v->si_item == SI_OVERVIEW ? "SYSINFO" : it == SI_ITEM_NET ? "NETWORK" : si_names[it], right, 0, 0);
     if (!v->si_live) {
-        header(KNOB_NONE, "SYSINFO", NULL, 0, 0);
         cv_text2x((uint8_t)((SCREEN_W - text2x_width("NO HOST")) / 2), 17, "NO HOST");
         cv_center(40, "start the PC agent");
+    } else if (v->si_item == SI_OVERVIEW) {
+        draw_si_rows(v->si_rows, SI_TOP, SI_X0);
+    } else if (it == SI_ITEM_DISK || it == SI_ITEM_NET) {
+        draw_si_rates(it);
     } else {
-        sysinfo_item_t it       = (sysinfo_item_t)v->si_item;
-        char           right[8] = "";
-        if (v->si_pages > 1) {
-            append_num(right, v->si_page + 1);
-            strcat(right, "/");
-            append_num(right, v->si_pages);
-        }
-        header(KNOB_NONE, v->si_item == SI_OVERVIEW ? "SYSINFO" : it == SI_ITEM_NET ? "NETWORK" : si_names[it], right, 0, 0);
-        if (v->si_item == SI_OVERVIEW) {
-            draw_si_rows(v->si_rows, SI_TOP, SI_X0);
-        } else if (it == SI_ITEM_DISK || it == SI_ITEM_NET) {
-            draw_si_rates(it);
-        } else {
-            draw_si_percent(it);
-        }
+        draw_si_percent(it);
     }
     cv_flush(1, 6);
     draw_status_strip(v, 0);
@@ -1163,8 +1161,8 @@ static void si_value_text(char *out, const sysinfo_config_t *c, sysinfo_field_t 
 /* SYSINFO SETUP: five rows of the fields that apply, round the selected
  * one, '*' on an unsaved change, a help line for the field. */
 static void draw_si_setup(const view_t *v) {
-    static const char *const names[SI_FIELDS]           = {"SHOW", " CPU", " RAM", " DISK", " NET", " GPU", "STYLE", "IDLE", "SCREEN OFF", "EVERY", "FOR"};
-    static const char *const help[SI_FIELDS]            = {"what the view shows", "custom: show CPU", "custom: show RAM", "custom: show disk", "custom: show network", "custom: show GPU", "", "screensaver after", "then the screen off", "how often the strip", "how long it stays"};
+    static const char *const names[SI_FIELDS]           = {"STYLE", "SHOW", " CPU", " RAM", " DISK", " NET", " GPU", "IDLE", "SCREEN OFF", "EVERY", "FOR"};
+    static const char *const help[SI_FIELDS]            = {"", "", "custom: show CPU", "custom: show RAM", "custom: show disk", "custom: show network", "custom: show GPU", "screensaver after", "then the screen off", "how often the strip", "how long it stays"};
     static const char *const style_help[SI_STYLE_COUNT] = {"only in this view", "strip on other layers", "full screen when idle"};
     header(KNOB_VALUE, "SYSINFO SETUP", NULL, 0, 0);
 
@@ -1194,7 +1192,10 @@ static void draw_si_setup(const view_t *v) {
         if (strcmp(val, was) != 0) row[19] = '*';
         line_text(1 + r, row, f == v->si_field);
     }
-    line_center(6, v->si_field == SI_FIELD_STYLE ? style_help[v->si_cfg.style] : help[v->si_field], false);
+    const char *h = help[v->si_field];
+    if (v->si_field == SI_FIELD_STYLE) h = style_help[v->si_cfg.style];
+    if (v->si_field == SI_FIELD_SHOW) h = v->si_cfg.style == SI_STYLE_SAVER ? "what the saver shows" : v->si_cfg.style == SI_STYLE_STRIP ? "what the strip shows" : "for strip and saver";
+    line_center(6, h, false);
     line_center(7, "TSKMGR save BOOT esc", false);
 }
 
@@ -1462,7 +1463,7 @@ void ui_oled_render(uint8_t layer, uint8_t layer_count, const ui_layer_legend_t 
                 uint32_t now = timer_read32();
                 v.si_rx      = sysinfo_rx_count();
                 v.si_shift   = (uint8_t)((now / SAVER_SHIFT_MS) % 8);
-                v.si_rows    = sysinfo_overview_items(sysinfo_overview_items(1) ? (uint8_t)((now / SAVER_PAGE_MS) & 1) : 0);
+                v.si_rows    = sysinfo_saver_items(sysinfo_saver_items(1) ? (uint8_t)((now / SAVER_PAGE_MS) & 1) : 0);
             }
             __attribute__((fallthrough)); // the bottom line, as on the layer screens
         case SCR_LAYER:

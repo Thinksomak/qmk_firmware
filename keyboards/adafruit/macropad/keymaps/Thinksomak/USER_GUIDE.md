@@ -139,7 +139,7 @@ Every screen has the same frame:
 **Header.** The name of the layer or open screen on the left. Main layers
 show the layer dots on the right. A **±** before the name means the knob
 changes a value there. Stats and SYSINFO show their page number, e.g.
-`2/6`, where the knob turns pages.
+`2/7`, where the knob turns pages.
 
 **Bottom line**, left to right, each icon always in its own place:
 
@@ -490,19 +490,20 @@ press. Turn pages with the knob or the top-left (◀) / top-middle (▶) keys.
 | SYSINF | close |
 | NS, RGB and the RGB keys | keep their normal job |
 
-**Pages**, with everything shown (the default):
+**Pages**: the view always has all seven, whatever SHOW says (SHOW in
+Setup only picks what the strip and the screensaver show, §5.4):
 
 | Page | Shows |
 |---|---|
 | 1 Overview | CPU (a line of about the last minute), RAM and GPU (bars), each with its %; GPU only while the agent sends it |
 | 2 Overview | DISK read (R) and write (W), NETWORK download (D) and upload (U), with units |
-| CPU | the number large, a bar, and the last two minutes as a line |
-| RAM, GPU | the number large and a bar |
-| DISK, NETWORK | both rates large, e.g. `12.6 MB/s` |
+| 3 CPU | the number large, a bar, and the last two minutes as a line |
+| 4 RAM, 5 GPU | the number large and a bar. Without GPU data the GPU page says how to turn it on: `gpu = nvidia` in the agent's settings (§5.1) |
+| 6 DISK, 7 NETWORK | both rates large, e.g. `12.6 MB/s` |
 
 ```
 ┌──────────────────────────────┐   ┌──────────────────────────────┐
-│▓SYSINFO▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓1/6▓│   │▓SYSINFO▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓2/6▓│
+│▓SYSINFO▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓1/7▓│   │▓SYSINFO▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓2/7▓│
 │                              │   │ DISK  R         12.3 MB/s    │
 │ CPU    ~^~~^~~~~^~~~    37%  │   │       W          820 KB/s    │
 │                              │   │                              │
@@ -512,10 +513,11 @@ press. Turn pages with the knob or the top-left (◀) / top-middle (▶) keys.
 └──────────────────────────────┘   └──────────────────────────────┘
 ```
 
-* A smaller choice that fits one page is shown on one overview page.
 * Units: KB/s, MB/s, GB/s, picked to fit (1 KB = 1024 bytes).
 * **NO HOST**: after 3 seconds without numbers (agent stopped, PC asleep,
   macropad not found), every page shows `NO HOST — start the PC agent`.
+  The header keeps the page's name and number (`CPU 3/7`), so the knob
+  still visibly turns the pages.
 
 ### 5.3 Setup
 
@@ -532,11 +534,16 @@ SETUP**. Keys work like the pomodoro settings:
 Knob: twist = −1 / +1, press = next field. Untouched for 30 seconds, setup
 closes without saving.
 
+Setup opens on STYLE, with SHOW under it. SHOW picks what the strip and
+the screensaver show (the view itself always has every page); with SHOW =
+CUSTOM, a switch per item (CPU, RAM, DISK, NET, GPU) picks them one by
+one. IDLE and SCREEN OFF appear with SAVER, EVERY and FOR with STRIP.
+
 | Field | Choices | Default |
 |---|---|---|
-| SHOW | ALL, CPU, RAM, DISK, NET, GPU, CUSTOM | ALL (GPU only if the agent sends it) |
-| CPU / RAM / DISK / NET / GPU (with CUSTOM) | on / off each | all on except GPU |
 | STYLE | OFF, STRIP, SAVER (§5.4) | OFF |
+| SHOW | what the strip and the screensaver show: ALL, CPU, RAM, DISK, NET, GPU, CUSTOM | ALL (GPU only if the agent sends it) |
+| CPU / RAM / DISK / NET / GPU (with CUSTOM) | on / off each | all on except GPU |
 | IDLE (SAVER) | 15 s, 30 s, 1, 2, 5, 10, 15 min | 1 min |
 | SCREEN OFF (SAVER) | 1, 5, 10, 15, 30, 60 min, never | 10 min |
 | EVERY (STRIP) | 10, 15, 20, 30, 45 s, 1, 2, 3, 5, 10, 15, 20, 30 min | 1 min |
@@ -547,8 +554,8 @@ closes without saving.
 | Style | What happens outside the SYSINFO view |
 |---|---|
 | **OFF** | nothing; the screen sleeps after 10 minutes without a key |
-| **STRIP** | every EVERY, for FOR seconds, the line under the header on every layer shows the stats, one group after another: `CPU 37%  RAM 62%`, `GPU 18%`, `DISK R 12.3M  W 820K`, `NET D 1.21M  U 96K`. The groups share the FOR seconds. |
-| **SAVER** | after IDLE without a key or twist, the overview fills the screen (a screensaver) until you touch the macropad; two overview pages take turns every 10 s. The screen turns off SCREEN OFF later, or never. |
+| **STRIP** | every EVERY, for FOR seconds, the line under the header on every layer shows the stats SHOW picks, one group after another: `CPU 37%  RAM 62%`, `GPU 18%`, `DISK R 12.3M  W 820K`, `NET D 1.21M  U 96K`. The groups share the FOR seconds. |
+| **SAVER** | after IDLE without a key or twist, an overview of the stats SHOW picks fills the screen (a screensaver) until you touch the macropad; a choice that fits one page stays on one, otherwise the two pages take turns every 10 s. The screen turns off SCREEN OFF later, or never. |
 
 Screensaver details: every 30 s the picture moves a pixel sideways and
 every 2 minutes a row up or down, so no pixel stays lit in one place. The

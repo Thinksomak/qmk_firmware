@@ -96,7 +96,8 @@ void sysinfo_format_rate(char *out, uint32_t kbps);
 typedef enum { SI_ITEM_CPU, SI_ITEM_RAM, SI_ITEM_DISK, SI_ITEM_NET, SI_ITEM_GPU, SI_ITEMS } sysinfo_item_t;
 #define SI_OVERVIEW 0xFF // sysinfo_page_item() for the page with every item
 
-/* SHOW setting. ALL leaves GPU out while the host does not send it. */
+/* SHOW setting: what the strip and the screensaver show (the view always
+ * has every page). ALL leaves GPU out while the host does not send it. */
 typedef enum { SI_SHOW_ALL, SI_SHOW_CPU, SI_SHOW_RAM, SI_SHOW_DISK, SI_SHOW_NET, SI_SHOW_GPU, SI_SHOW_CUSTOM, SI_SHOW_COUNT } sysinfo_show_t;
 
 /* How the stats show outside the SYSINFO view:
@@ -117,14 +118,16 @@ typedef struct {
     uint8_t off;    // then screen off after, index into the SCREEN OFF steps
 } sysinfo_config_t;
 
+/* SETUP fields, top to bottom. STYLE and SHOW always show; SHOW chooses what
+ * the strip and the screensaver show. */
 typedef enum {
+    SI_FIELD_STYLE,
     SI_FIELD_SHOW,
     SI_FIELD_CPU, // the five item fields only while SHOW is CUSTOM
     SI_FIELD_RAM,
     SI_FIELD_DISK,
     SI_FIELD_NET,
     SI_FIELD_GPU,
-    SI_FIELD_STYLE,
     SI_FIELD_IDLE, // IDLE and SCREEN OFF only with the SAVER style
     SI_FIELD_OFF,
     SI_FIELD_EVERY, // EVERY and FOR only with the STRIP style
@@ -168,16 +171,21 @@ bool sysinfo_in_setup(void);
 /* Call from process_record_user after the pomodoro. False when used. */
 bool sysinfo_process_record(keyrecord_t *record);
 
-uint8_t sysinfo_items(void);      // item bits shown now
+uint8_t sysinfo_items(void); // item bits the strip and the screensaver show (SHOW)
+
+/* The view always has every page, whatever SHOW says: the overviews, then
+ * one page per item, CPU / RAM / GPU / DISK / NETWORK. */
 uint8_t sysinfo_page(void);       // 0 .. sysinfo_page_count() - 1
-uint8_t sysinfo_page_count(void); // overviews + one page per item (one item: 1 page)
+uint8_t sysinfo_page_count(void); // overviews + one page per item
 uint8_t sysinfo_page_item(void);  // SI_OVERVIEW or a sysinfo_item_t
 
-/* The overview pages come first, k = 0 and 1: every shown item on one page
- * when they fit, otherwise CPU / RAM / GPU on the first and DISK / NET on
- * the second. Item bits of overview k, 0 when there is no such page. The
- * screensaver shows the same pages in turn. */
+/* Overview pages, k = 0 and 1: every item on one page when they fit,
+ * otherwise CPU / RAM / GPU on the first and DISK / NET on the second.
+ * Item bits of overview k, 0 when there is no such page. The view's hold
+ * every item (the GPU while the host sends it); the screensaver's, which
+ * it shows in turn, hold the items SHOW asks for. */
 uint8_t sysinfo_overview_items(uint8_t k);
+uint8_t sysinfo_saver_items(uint8_t k);
 
 const sysinfo_config_t *sysinfo_config(void);       // saved settings
 const sysinfo_config_t *sysinfo_setup_values(void); // values being edited
